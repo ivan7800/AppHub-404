@@ -1,4 +1,4 @@
-# QA Report — AppHub 404 v2.4.4
+# QA Report — AppHub 404 v2.4.7
 
 Fecha: 2026-08-13
 
@@ -14,7 +14,7 @@ No se han detectado bloqueos críticos en estructura, sintaxis, rutas locales, m
 
 ```text
 npm test
-OK v2.4.4: 86 apps, 13 categorías, 9 packs; CSP, PWA, inventario, backups, validación de catálogo y scripts auditados.
+OK v2.4.7: 86 apps, 13 categorías, 9 packs; CSP, PWA, inventario, backups, validación de catálogo y scripts auditados.
 ```
 
 ### JavaScript
@@ -76,7 +76,7 @@ Respuesta HTTP 200 confirmada para:
 - `examples/inventory-example.json`
 - `assets/icons/icon-192.png`
 
-## Regresiones específicas v2.4.4
+## Regresiones específicas v2.4.7
 
 Comprobadas por tests/código:
 
@@ -87,8 +87,8 @@ Comprobadas por tests/código:
 - etiquetas BAT se saneam frente a metacaracteres de `cmd.exe`;
 - validador de catálogo existe y usa esquema `apphub-404-catalog-validation-v1`;
 - validador no instala, actualiza ni desinstala;
-- service worker usa caché v2.4.4;
-- versión centralizada v2.4.4.
+- service worker usa caché v2.4.7;
+- versión centralizada v2.4.7.
 
 ## Pruebas no completadas
 
@@ -106,7 +106,7 @@ Este entorno no dispone de `pwsh`, Windows PowerShell ni WinGet. No se han ejecu
 
 ### Navegador gráfico automatizado
 
-Chromium existe en el entorno, pero el intento headless no completó por fallo GPU/DBus del contenedor. Por tanto no se afirma una prueba visual automatizada end-to-end de v2.4.4.
+Chromium existe en el entorno, pero el intento headless no completó por fallo GPU/DBus del contenedor. Por tanto no se afirma una prueba visual automatizada end-to-end de v2.4.7.
 
 ## Matriz recomendada antes de 10/10
 
@@ -124,6 +124,6 @@ Chromium existe en el entorno, pero el intento headless no completó por fallo G
 
 **9,1/10.** La capa estática y de generación queda bien cubierta; la nota está limitada por la ausencia de ejecución real de la capa Windows y de E2E visual fiable en este entorno.
 
-## Prueba UAC aislada v2.4.4
+## Prueba UAC aislada v2.4.7
 
 Se incluye `tools/test-uac-elevation.bat`. No instala software ni ejecuta WinGet. Sirve exclusivamente para comprobar el flujo: BAT sin elevar -> PowerShell -> `Start-Process -Verb RunAs` sobre `%ComSpec%` -> `cmd /d /c call "ruta-del-bat"` -> BAT elevado.

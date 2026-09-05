@@ -1,10 +1,10 @@
-# AppHub 404 v2.4.4
+# AppHub 404 v2.4.7
 
 AppHub 404 es una PWA estática y local-first para gestionar software de Windows mediante WinGet sin backend, cuentas ni telemetría. Permite explorar un catálogo curado, generar scripts de instalación/actualización/desinstalación, importar inventarios, comparar equipos, crear copias de seguridad y generar herramientas de diagnóstico y mantenimiento.
 
 ## Estado
 
-- Versión: **2.4.4**
+- Versión: **2.4.7**
 - Catálogo: **86 aplicaciones**
 - Categorías: **13**
 - Packs: **9**
@@ -114,7 +114,7 @@ Consulte `QA-REPORT.md`, `SECURITY.md` y `FINAL-AUDIT-REPORT.md` antes de public
 
 ## Limitaciones reales
 
-Una PWA no puede ejecutar WinGet ni inspeccionar Windows directamente. AppHub genera scripts revisables que el usuario ejecuta localmente. La disponibilidad de un ID WinGet puede cambiar después de publicar la PWA; por eso v2.4.4 incorpora el validador local del catálogo.
+Una PWA no puede ejecutar WinGet ni inspeccionar Windows directamente. AppHub genera scripts revisables que el usuario ejecuta localmente. La disponibilidad de un ID WinGet puede cambiar después de publicar la PWA; por eso v2.4.7 incorpora el validador local del catálogo.
 
 La ejecución real de UAC, WinGet, PowerShell y el Programador de tareas debe validarse en Windows 10/11. El service worker solo funciona en contexto seguro (HTTPS o localhost), no desde `file://`.
 

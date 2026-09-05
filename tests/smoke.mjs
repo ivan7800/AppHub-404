@@ -19,7 +19,7 @@ for (const file of ['assets/js/config.js', 'assets/js/app.js', 'assets/js/system
 }
 
 const pkg = JSON.parse(read('package.json'));
-assert.equal(pkg.version, '2.4.4', 'Versión package incorrecta');
+assert.equal(pkg.version, '2.4.7', 'Versión package incorrecta');
 
 const manifest = JSON.parse(read('manifest.webmanifest'));
 assert.equal(manifest.name, 'AppHub 404');
@@ -79,7 +79,7 @@ assert.ok(html.includes("style-src 'self'"), 'La CSP debe bloquear estilos inlin
 assert.ok(!html.includes("'unsafe-inline'"), 'La CSP conserva unsafe-inline');
 assert.ok(html.includes('assets/js/config.js'), 'No se carga config.js');
 assert.ok(html.includes('assets/js/system-tools.js'), 'No se carga system-tools.js');
-assert.ok(html.includes('id="appVersionLabel">v2.4.4'), 'Versión visible no actualizada');
+assert.ok(html.includes('id="appVersionLabel">v2.4.7'), 'Versión visible no actualizada');
 assert.ok((html.match(/<th scope="col">/g) || []).length >= 7, 'Las tablas carecen de scope suficiente');
 for (const id of [
   'appsGrid', 'packsGrid', 'builderDialog', 'scriptPreview', 'downloadScript', 'openUpdater', 'updaterDialog',
@@ -99,17 +99,19 @@ assert.ok(!appJs.includes('.style.'), 'app.js usa estilos inline incompatibles c
 assert.ok(appJs.includes('noopener noreferrer'), 'Los enlaces externos deben aislar opener');
 assert.ok(appJs.includes('AppHub 404 v${VERSION}'), 'Los scripts deben tomar la versión centralizada');
 assert.ok((appJs.match(/-Verb RunAs/g) || []).length >= 2, 'Instalador y actualizador PowerShell deben autoelevarse con UAC');
-assert.ok((appJs.match(/Security\.Principal\.WindowsPrincipal/g) || []).length >= 4, 'Los scripts deben comprobar el rol de administrador');
+assert.ok((appJs.match(/Security\.Principal\.WindowsPrincipal/g) || []).length >= 2, 'Los scripts PowerShell deben comprobar el rol de administrador');
 assert.ok(appJs.includes('externalOnly'), 'El catálogo debe distinguir descargas oficiales externas de paquetes WinGet');
 assert.ok(appJs.includes("!appsById.get(id).externalOnly"), 'La restauración de selección debe excluir apps externas');
-assert.ok(appJs.includes('APPHUB_SELF'), 'El BAT debe relanzarse por UAC sin incrustar la ruta en una cadena PowerShell');
+assert.ok(appJs.includes('APPHUB_SELF=%~f0'), 'El BAT debe transmitir su propia ruta mediante APPHUB_SELF');
 assert.ok(appJs.includes('System32\\WindowsPowerShell\\v1.0\\powershell.exe'), 'La elevación debe usar una ruta fiable de Windows PowerShell');
 assert.ok(appJs.includes('-PassThru'), 'La elevación debe validar que se creó el proceso elevado');
 assert.ok(appJs.includes('No se pudo obtener elevacion'), 'El BAT debe avisar cuando UAC falle o se cancele');
 assert.ok((appJs.match(/Start-Process -FilePath \$env:ComSpec -Verb RunAs/g) || []).length >= 2, 'Los BAT deben elevar cmd.exe mediante UAC');
 assert.ok(!appJs.includes('Start-Process -FilePath $env:APPHUB_SELF -Verb RunAs'), 'No se debe intentar elevar directamente el BAT');
 assert.ok(!appJs.includes("$q + $q + $env:APPHUB_SELF + $q + $q"), 'El BAT no debe envolver la ruta con comillas dobles duplicadas al relanzar cmd.exe');
-assert.ok(appJs.includes("$arg='/d /c call ' + $q + $env:APPHUB_SELF + $q"), 'El BAT debe relanzarse mediante cmd /c call con la ruta entrecomillada');
+assert.ok(appJs.includes("$arg='/d /c call ' + $q + $env:APPHUB_SELF + $q"), 'El BAT debe relanzar el propio script mediante cmd /c call');
+assert.ok((appJs.match(/fltmc >nul 2>&1/g) || []).length >= 2, 'Los BAT generados deben usar la misma comprobación administrativa fltmc validada manualmente');
+assert.ok((appJs.match(/goto :APPHUB_ELEVATED/g) || []).length >= 2, 'Los BAT generados deben usar flujo por etiqueta en vez de envolver la elevación en un bloque IF');
 assert.ok(appJs.includes("$q=[char]34; $arg='/d /c call '"), 'El relanzamiento BAT debe usar CALL para evitar el caso ambiguo de cmd /c con comando entrecomillado');
 assert.ok(html.includes('name="format" value="bat" checked'), 'BAT debe ser el formato predeterminado del instalador');
 assert.ok(html.includes('name="updaterFormat" value="bat" checked'), 'BAT debe ser el formato predeterminado del actualizador');
@@ -135,7 +137,7 @@ assert.ok(toolsJs.includes("!appById.get(id).externalOnly"), 'Backups y restaura
 const scanner = read('tools/apphub-404-scan.ps1').replace(/^\uFEFF/, '');
 for (const token of [
   'winget export', '--include-versions', 'winget = [ordered]', 'Get-MpComputerStatus',
-  'Get-WindowsOptionalFeature', 'apphub-404-inventory-v2', "appVersion = '2.4.4'", '[switch]$NoPause',
+  'Get-WindowsOptionalFeature', 'apphub-404-inventory-v2', "appVersion = '2.4.7'", '[switch]$NoPause',
   '[switch]$IncludeDiagnosticText', 'Set-Content -LiteralPath'
 ]) assert.ok(scanner.includes(token), `Falta comprobación del analizador: ${token}`);
 assert.ok(!scanner.match(/winget\s+(install|upgrade|uninstall)\b/i), 'El analizador debe ser de solo lectura');
@@ -150,7 +152,7 @@ assert.ok(example.winget.packages.length >= 3 && example.health.length >= 3, 'Ej
 assert.ok(!('items' in (example.software || {})), 'El ejemplo expone software del Registro innecesariamente');
 
 const sw = read('service-worker.js');
-assert.ok(sw.includes('apphub-404-v2.4.4'), 'Caché PWA sin actualizar');
+assert.ok(sw.includes('apphub-404-v2.4.7'), 'Caché PWA sin actualizar');
 assert.ok(sw.includes('assets/js/config.js'), 'Service worker no precachea config.js');
 assert.ok(sw.includes("request.mode === 'navigate'"), 'Falta estrategia específica de navegación');
 assert.ok(sw.includes('url.origin !== self.location.origin'), 'El service worker debe limitarse al mismo origen');
