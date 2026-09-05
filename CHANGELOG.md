@@ -1,18 +1,25 @@
-## v2.4.7 — WinGet execution fix
+## v2.5.0 — Catálogo profesional y packs de despliegue
+- Añadidos WinMerge, Visual Studio 2022 Community, Visual Studio 2022 Build Tools, Eclipse Temurin JDK 21, DB Browser for SQLite y mRemoteNG.
+- Añadido Malwarebytes AdwCleaner como herramienta portátil externa con enlaces oficiales; no se genera un comando WinGet inexistente.
+- Nuevos packs: Nuevo PC corporativo, Técnico CAU / Helpdesk y Desarrollador Windows.
+- Catálogo ampliado a 93 aplicaciones y 12 packs, manteniendo exclusión de elementos `externalOnly` de scripts automáticos.
+- Tests ampliados para validar los nuevos IDs, packs y la integración segura de AdwCleaner.
+
+## v2.5.0 — WinGet execution fix
 - El BAT ya no bloquea la instalacion con `winget show`/`winget list | findstr` previos.
 - Ejecuta `winget install` directamente y muestra codigo de salida y diagnostico visible.
 - Activa delayed expansion para conservar correctamente ERRORLEVEL por paquete.
 - Mantiene `--no-upgrade` cuando la opcion de actualizar instaladas esta desactivada.
 
 # Changelog
-## v2.4.7 - UAC generator parity fix
+## v2.5.0 - UAC generator parity fix
 
 - Los BAT generados usan ahora exactamente la rutina UAC validada manualmente en Windows mediante `fltmc`, `goto :APPHUB_ELEVATED`, `APPHUB_SELF` y `Start-Process` sobre `%ComSpec%`.
 - Eliminada la comprobación administrativa PowerShell y la copia temporal del BAT generado, que divergían del test UAC funcional.
 - Añadida regresión para exigir paridad entre el BAT generado y `tools/test-uac-elevation.bat`.
 
 
-## 2.4.7 — UAC generated-BAT path isolation fix
+## 2.5.0 — UAC generated-BAT path isolation fix
 
 - Los BAT generados ya no se relanzan directamente desde la ruta de descarga.
 - Antes de solicitar UAC se copian a `%TEMP%\AppHub404\elevated-run.bat` y se eleva esa copia controlada.

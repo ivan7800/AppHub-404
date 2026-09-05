@@ -1,6 +1,6 @@
 {
   "name": "apphub-404",
-  "version": "2.4.7",
+  "version": "2.5.0",
   "private": true,
   "scripts": {
     "test": "node tests/smoke.mjs"

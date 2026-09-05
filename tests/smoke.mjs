@@ -19,7 +19,7 @@ for (const file of ['assets/js/config.js', 'assets/js/app.js', 'assets/js/system
 }
 
 const pkg = JSON.parse(read('package.json'));
-assert.equal(pkg.version, '2.4.7', 'Versión package incorrecta');
+assert.equal(pkg.version, '2.5.0', 'Versión package incorrecta');
 
 const manifest = JSON.parse(read('manifest.webmanifest'));
 assert.equal(manifest.name, 'AppHub 404');
@@ -36,9 +36,9 @@ vm.runInContext(read('assets/js/config.js'), sandbox);
 vm.runInContext(read('assets/js/apps-data.js'), sandbox);
 assert.equal(sandbox.window.APPHUB_CONFIG.version, pkg.version, 'Config y package no coinciden');
 const data = sandbox.window.APPHUB_DATA;
-assert.ok(data.apps.length >= 86, 'Catálogo demasiado pequeño');
+assert.ok(data.apps.length >= 93, 'Catálogo demasiado pequeño');
 assert.ok(data.categories.length >= 13, 'Faltan categorías');
-assert.ok(data.packs.length >= 9, 'Faltan packs');
+assert.ok(data.packs.length >= 12, 'Faltan packs');
 assert.equal(new Set(data.apps.map(app => app.id)).size, data.apps.length, 'Hay IDs duplicados');
 const ids = new Set(data.apps.map(app => app.id));
 const categoryIds = new Set(data.categories.map(category => category.id));
@@ -67,6 +67,19 @@ for (const id of ['Cisco.SecureClient.External','Fortinet.FortiClientVPN.Externa
   assert.ok(app.links?.some(link => /^https:\/\//.test(link.url)), `Falta enlace oficial HTTPS para ${id}`);
   assert.ok(!remotePack.apps.includes(id), `Una descarga externa no debe entrar en scripts: ${id}`);
 }
+
+for (const id of ['WinMerge.WinMerge','Microsoft.VisualStudio.2022.Community','Microsoft.VisualStudio.2022.BuildTools','EclipseAdoptium.Temurin.21.JDK','DBBrowserForSQLite.DBBrowserForSQLite','mRemoteNG.mRemoteNG']) {
+  const app = data.apps.find(item => item.id === id);
+  assert.ok(app && !app.externalOnly, `Falta aplicación WinGet nueva: ${id}`);
+}
+const adw = data.apps.find(app => app.id === 'Malwarebytes.AdwCleaner.External');
+assert.ok(adw?.externalOnly, 'AdwCleaner debe integrarse como descarga oficial externa');
+assert.ok(adw.links?.some(link => /malwarebytes\.com\/adwcleaner/.test(link.url)), 'AdwCleaner debe enlazar a Malwarebytes oficial');
+for (const packId of ['corporate-new-pc','helpdesk-cau','windows-developer']) assert.ok(data.packs.some(pack => pack.id === packId), `Falta pack nuevo: ${packId}`);
+assert.ok(data.packs.find(pack => pack.id === 'helpdesk-cau').apps.includes('mRemoteNG.mRemoteNG'), 'Helpdesk debe incluir mRemoteNG');
+assert.ok(data.packs.find(pack => pack.id === 'windows-developer').apps.includes('Microsoft.VisualStudio.2022.BuildTools'), 'Desarrollador Windows debe incluir Build Tools');
+assert.ok(!data.packs.some(pack => pack.apps.includes('Malwarebytes.AdwCleaner.External')), 'AdwCleaner externalOnly no debe entrar en packs ejecutables');
+
 const dellOptimizer = data.apps.find(app => app.id === 'XP9B49CJ91XF01');
 assert.ok(dellOptimizer && dellOptimizer.source === 'msstore', 'Dell Optimizer debe existir y usar msstore');
 
@@ -79,7 +92,7 @@ assert.ok(html.includes("style-src 'self'"), 'La CSP debe bloquear estilos inlin
 assert.ok(!html.includes("'unsafe-inline'"), 'La CSP conserva unsafe-inline');
 assert.ok(html.includes('assets/js/config.js'), 'No se carga config.js');
 assert.ok(html.includes('assets/js/system-tools.js'), 'No se carga system-tools.js');
-assert.ok(html.includes('id="appVersionLabel">v2.4.7'), 'Versión visible no actualizada');
+assert.ok(html.includes('id="appVersionLabel">v2.5.0'), 'Versión visible no actualizada');
 assert.ok((html.match(/<th scope="col">/g) || []).length >= 7, 'Las tablas carecen de scope suficiente');
 for (const id of [
   'appsGrid', 'packsGrid', 'builderDialog', 'scriptPreview', 'downloadScript', 'openUpdater', 'updaterDialog',
@@ -137,7 +150,7 @@ assert.ok(toolsJs.includes("!appById.get(id).externalOnly"), 'Backups y restaura
 const scanner = read('tools/apphub-404-scan.ps1').replace(/^\uFEFF/, '');
 for (const token of [
   'winget export', '--include-versions', 'winget = [ordered]', 'Get-MpComputerStatus',
-  'Get-WindowsOptionalFeature', 'apphub-404-inventory-v2', "appVersion = '2.4.7'", '[switch]$NoPause',
+  'Get-WindowsOptionalFeature', 'apphub-404-inventory-v2', "appVersion = '2.5.0'", '[switch]$NoPause',
   '[switch]$IncludeDiagnosticText', 'Set-Content -LiteralPath'
 ]) assert.ok(scanner.includes(token), `Falta comprobación del analizador: ${token}`);
 assert.ok(!scanner.match(/winget\s+(install|upgrade|uninstall)\b/i), 'El analizador debe ser de solo lectura');
@@ -152,7 +165,7 @@ assert.ok(example.winget.packages.length >= 3 && example.health.length >= 3, 'Ej
 assert.ok(!('items' in (example.software || {})), 'El ejemplo expone software del Registro innecesariamente');
 
 const sw = read('service-worker.js');
-assert.ok(sw.includes('apphub-404-v2.4.7'), 'Caché PWA sin actualizar');
+assert.ok(sw.includes('apphub-404-v2.5.0'), 'Caché PWA sin actualizar');
 assert.ok(sw.includes('assets/js/config.js'), 'Service worker no precachea config.js');
 assert.ok(sw.includes("request.mode === 'navigate'"), 'Falta estrategia específica de navegación');
 assert.ok(sw.includes('url.origin !== self.location.origin'), 'El service worker debe limitarse al mismo origen');

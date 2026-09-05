@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const CONFIG = window.APPHUB_CONFIG || { version: '2.4.7' };
+  const CONFIG = window.APPHUB_CONFIG || { version: '2.5.0' };
   const VERSION = CONFIG.version;
   const DATA = window.APPHUB_DATA;
   if (!DATA || !Array.isArray(DATA.apps) || !Array.isArray(DATA.categories) || !Array.isArray(DATA.packs)) {

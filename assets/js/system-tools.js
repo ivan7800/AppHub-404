@@ -2,7 +2,7 @@
   'use strict';
 
   const CONFIG = window.APPHUB_CONFIG || {};
-  const VERSION = CONFIG.version || '2.4.7';
+  const VERSION = CONFIG.version || '2.5.0';
   const INVENTORY_SCHEMA = CONFIG.inventorySchema || 'apphub-404-inventory-v2';
   const BACKUP_SCHEMA = CONFIG.backupSchema || 'apphub-404-backup-v2';
   const INVENTORY_KEY = 'apphub-inventories-v2';
