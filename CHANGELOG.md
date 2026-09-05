@@ -1,4 +1,24 @@
+## v2.4.7 — WinGet execution fix
+- El BAT ya no bloquea la instalacion con `winget show`/`winget list | findstr` previos.
+- Ejecuta `winget install` directamente y muestra codigo de salida y diagnostico visible.
+- Activa delayed expansion para conservar correctamente ERRORLEVEL por paquete.
+- Mantiene `--no-upgrade` cuando la opcion de actualizar instaladas esta desactivada.
+
 # Changelog
+## v2.4.7 - UAC generator parity fix
+
+- Los BAT generados usan ahora exactamente la rutina UAC validada manualmente en Windows mediante `fltmc`, `goto :APPHUB_ELEVATED`, `APPHUB_SELF` y `Start-Process` sobre `%ComSpec%`.
+- Eliminada la comprobación administrativa PowerShell y la copia temporal del BAT generado, que divergían del test UAC funcional.
+- Añadida regresión para exigir paridad entre el BAT generado y `tools/test-uac-elevation.bat`.
+
+
+## 2.4.7 — UAC generated-BAT path isolation fix
+
+- Los BAT generados ya no se relanzan directamente desde la ruta de descarga.
+- Antes de solicitar UAC se copian a `%TEMP%\AppHub404\elevated-run.bat` y se eleva esa copia controlada.
+- Esto evita fallos dependientes del nombre/ruta del archivo descargado (espacios, paréntesis, OneDrive u otros caracteres).
+- Añadido `tools/test-generated-bat-elevation.bat` para reproducir exactamente el nuevo flujo sin ejecutar WinGet.
+
 
 ## 2.4.4 — UAC BAT quoting hotfix
 

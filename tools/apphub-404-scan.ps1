@@ -1,4 +1,4 @@
-# AppHub 404 v2.4.4 - Analizador local de inventario y salud
+# AppHub 404 v2.4.7 - Analizador local de inventario y salud
 # No instala, actualiza ni desinstala aplicaciones. Solo recopila información local y crea un JSON.
 [CmdletBinding()]
 param(
@@ -176,7 +176,7 @@ $RegistrySoftware = @($RegistrySoftware | Sort-Object name,version,publisher -Un
 
 $Inventory = [ordered]@{
     schema = 'apphub-404-inventory-v2'
-    appVersion = '2.4.4'
+    appVersion = '2.4.7'
     scannedAt = (Get-Date).ToUniversalTime().ToString('o')
     computer = [ordered]@{
         name = $env:COMPUTERNAME

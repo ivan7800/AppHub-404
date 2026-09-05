@@ -1,6 +1,6 @@
 {
   "schema": "apphub-404-inventory-v2",
-  "appVersion": "2.4.4",
+  "appVersion": "2.4.7",
   "scannedAt": "2026-07-30T09:30:00.000Z",
   "computer": {
     "name": "DEMO-PC",

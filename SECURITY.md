@@ -1,4 +1,4 @@
-# Seguridad — AppHub 404 v2.4.4
+# Seguridad — AppHub 404 v2.4.7
 
 ## Modelo de seguridad
 
@@ -34,7 +34,7 @@ Los BAT pasan su propia ruta mediante una variable de entorno antes de solicitar
 
 ## WinGet
 
-Los IDs de paquetes son datos operativos que pueden cambiar. AppHub v2.4.4 incorpora un **validador de catálogo de solo lectura** que ejecuta `winget show --id <ID> -e --source <origen>` y genera un informe JSON. No instala ni modifica software.
+Los IDs de paquetes son datos operativos que pueden cambiar. AppHub v2.4.7 incorpora un **validador de catálogo de solo lectura** que ejecuta `winget show --id <ID> -e --source <origen>` y genera un informe JSON. No instala ni modifica software.
 
 Las descargas corporativas que no cuentan con un mecanismo WinGet fiable se presentan como enlaces oficiales externos y no entran en scripts automáticos.
 

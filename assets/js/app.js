@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const CONFIG = window.APPHUB_CONFIG || { version: '2.4.4' };
+  const CONFIG = window.APPHUB_CONFIG || { version: '2.4.7' };
   const VERSION = CONFIG.version;
   const DATA = window.APPHUB_DATA;
   if (!DATA || !Array.isArray(DATA.apps) || !Array.isArray(DATA.categories) || !Array.isArray(DATA.packs)) {
@@ -395,63 +395,12 @@ ${options.pause ? "Read-Host 'Pulsa Enter para cerrar'" : ''}
       const app = appsById.get(id);
       const name = batSafeLabel(app.name);
       const source = app.source || 'winget';
-      const requirement = app.requirement ? `echo Requisito: ${batSafeLabel(app.requirement)}
-` : '';
+      const requirement = app.requirement ? `echo Requisito: ${batSafeLabel(app.requirement)}\n` : '';
       const silent = options.silent ? ' --silent' : '';
-      return `echo.
-echo === ${name} ===
-${requirement}winget show --id "${id}" -e --source "${source}" --accept-source-agreements --disable-interactivity >nul 2>&1
-if errorlevel 1 (
-  echo [NO ENCONTRADO] ${id} en ${source}
-) else (
-  winget list --id "${id}" -e --source "${source}" --accept-source-agreements --disable-interactivity 2^>nul ^| findstr /L /C:"${id}" >nul
-  if errorlevel 1 (
-    winget install --id "${id}" -e --source "${source}" --accept-package-agreements --accept-source-agreements --disable-interactivity${silent}
-    if errorlevel 1 echo [ERROR AL INSTALAR] ${id}
-  ) else (
-${options.upgrade ? `    winget list --id "${id}" -e --source "${source}" --upgrade-available --accept-source-agreements --disable-interactivity 2^>nul ^| findstr /L /C:"${id}" >nul
-    if errorlevel 1 (
-      echo [SIN ACTUALIZACION] ${id}
-    ) else (
-      winget upgrade --id "${id}" -e --source "${source}" --accept-package-agreements --accept-source-agreements --disable-interactivity${silent}
-      if errorlevel 1 echo [ERROR AL ACTUALIZAR] ${id}
-    )` : `    echo [YA INSTALADA] ${id}`}
-  )
-)
-`;
+      const noUpgrade = options.upgrade ? '' : ' --no-upgrade';
+      return `echo.\necho === ${name} ===\n${requirement}echo [INSTALANDO] ${id}\nwinget install --id "${id}" -e --source "${source}" --accept-package-agreements --accept-source-agreements --disable-interactivity${silent}${noUpgrade}\nset "APPHUB_RC=!ERRORLEVEL!"\nif "!APPHUB_RC!"=="0" (\n  echo [OK] ${id}\n) else (\n  echo [ERROR !APPHUB_RC!] ${id}\n  echo Reintentando diagnostico de paquete...\n  winget show --id "${id}" -e --source "${source}" --accept-source-agreements --disable-interactivity\n)\n`;
     }).join('\n');
-    return `@echo off
-setlocal EnableExtensions
-title AppHub 404 - WinGet
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -Command "$p=New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent()); if($p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){exit 0}else{exit 1}" >nul 2>&1
-if errorlevel 1 (
-  echo Solicitando permisos de administrador mediante UAC...
-  set "APPHUB_SELF=%~f0"
-  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -Command "try { $q=[char]34; $arg='/d /c call ' + $q + $env:APPHUB_SELF + $q; $p=Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList $arg -PassThru; if($p){exit 0}else{exit 1} } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }"
-  if errorlevel 1 (
-    echo ERROR: No se pudo obtener elevacion. Comprueba UAC o ejecuta este BAT con ^"Ejecutar como administrador^".
-    pause
-    exit /b 1
-  )
-  exit /b 0
-)
-echo ========================================
-echo AppHub 404 - Instalacion WinGet
-echo ========================================
-where winget >nul 2>&1
-if errorlevel 1 (
-  echo ERROR: WinGet no esta disponible.
-  echo Instala o repara App Installer desde Microsoft Store.
-  pause
-  exit /b 1
-)
-${options.updateSources ? 'winget source update --disable-interactivity\n' : ''}
-${lines}
-echo.
-echo Proceso finalizado. Revisa los mensajes anteriores.
-${options.pause ? 'pause' : ''}
-endlocal
-`;
+    return `@echo off\nsetlocal EnableExtensions EnableDelayedExpansion\ntitle AppHub 404 - WinGet\nfltmc >nul 2>&1\nif %errorlevel%==0 goto :APPHUB_ELEVATED\n\necho Solicitando permisos de administrador mediante UAC...\nset "APPHUB_SELF=%~f0"\n"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $q=[char]34; $arg='/d /c call ' + $q + $env:APPHUB_SELF + $q; $p=Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList $arg -PassThru; if($p){exit 0}else{exit 1} } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }"\nif errorlevel 1 (\n  echo ERROR: No se pudo obtener elevacion. Usa boton derecho ^> Ejecutar como administrador.\n  pause\n  exit /b 1\n)\nexit /b 0\n\n:APPHUB_ELEVATED\necho ========================================\necho AppHub 404 - Instalacion WinGet\necho ========================================\nwhere winget >nul 2>&1\nif errorlevel 1 (\n  echo ERROR: WinGet no esta disponible en esta sesion.\n  echo Ejecuta: winget --info\n  pause\n  exit /b 1\n)\nwinget --info\n${options.updateSources ? 'winget source update --disable-interactivity\n' : ''}\n${lines}\necho.\necho Proceso finalizado. Revisa los mensajes anteriores.\n${options.pause ? 'pause' : 'pause'}\nendlocal\n`;
   }
 
   function generateWingetJSON(ids) {
@@ -609,18 +558,20 @@ ${options.pause ? "Read-Host 'Pulsa Enter para cerrar'" : ''}
     return `@echo off
 setlocal EnableExtensions
 title AppHub 404 - Actualizaciones WinGet
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -Command "$p=New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent()); if($p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){exit 0}else{exit 1}" >nul 2>&1
+fltmc >nul 2>&1
+if %errorlevel%==0 goto :APPHUB_ELEVATED
+
+echo Solicitando permisos de administrador mediante UAC...
+set "APPHUB_SELF=%~f0"
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $q=[char]34; $arg='/d /c call ' + $q + $env:APPHUB_SELF + $q; $p=Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList $arg -PassThru; if($p){exit 0}else{exit 1} } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }"
 if errorlevel 1 (
-  echo Solicitando permisos de administrador mediante UAC...
-  set "APPHUB_SELF=%~f0"
-  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -Command "try { $q=[char]34; $arg='/d /c call ' + $q + $env:APPHUB_SELF + $q; $p=Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList $arg -PassThru; if($p){exit 0}else{exit 1} } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }"
-  if errorlevel 1 (
-    echo ERROR: No se pudo obtener elevacion. Comprueba UAC o ejecuta este BAT con ^"Ejecutar como administrador^".
-    pause
-    exit /b 1
-  )
-  exit /b 0
+  echo ERROR: No se pudo obtener elevacion. Comprueba UAC o ejecuta este BAT con ^"Ejecutar como administrador^".
+  pause
+  exit /b 1
 )
+exit /b 0
+
+:APPHUB_ELEVATED
 set "LOG=%TEMP%\\AppHub404-Update-%RANDOM%-%RANDOM%.log"
 echo ========================================
 echo AppHub 404 - Actualizaciones WinGet
