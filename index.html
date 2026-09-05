@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="AppHub 404: instala y actualiza aplicaciones de Windows mediante scripts seguros de WinGet.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="referrer" content="no-referrer">
+  <meta name="application-name" content="AppHub 404">
+  <meta name="format-detection" content="telephone=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>AppHub 404 · Tu PC listo con WinGet</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Saltar al contenido</a>
+
+  <header class="topbar">
+    <a class="brand" href="#inicio" aria-label="AppHub 404, inicio">
+      <span class="brand-mark" aria-hidden="true">A4</span>
+      <span><strong>AppHub</strong><small>404</small></span>
+    </a>
+    <nav class="topnav" aria-label="Navegación principal">
+      <a href="#mi-pc">Mi PC</a>
+      <a href="#catalogo">Catálogo</a>
+      <a href="#actualizaciones">Actualizar</a>
+      <a href="#herramientas">Herramientas</a>
+      <span class="connection-status" id="connectionStatus" role="status" aria-live="polite">Local</span>
+      <button class="icon-button" id="themeToggle" type="button" aria-label="Cambiar tema" title="Cambiar tema">☼</button>
+    </nav>
+  </header>
+
+  <main id="mainContent">
+    <section class="hero" id="inicio">
+      <div class="hero-copy">
+        <p class="eyebrow">WINDOWS · WINGET · SIN BACKEND</p>
+        <h1>Prepara un PC completo <span>sin instalar app por app.</span></h1>
+        <p class="hero-lead">Elige programas, carga un pack y genera un script PowerShell, BAT o JSON compatible con WinGet. Todo ocurre en tu navegador.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#catalogo">Elegir aplicaciones</a>
+          <button class="button button-secondary" id="loadEssentialsHero" type="button">Cargar pack esencial</button>
+          <a class="button button-ghost" href="#mi-pc">Analizar este PC</a>
+          <button class="button button-ghost" id="openUpdaterHero" type="button">Actualizar este PC</button>
+        </div>
+        <div class="trust-row" aria-label="Características">
+          <span>✓ Sin cuentas</span><span>✓ Sin telemetría</span><span>✓ GitHub Pages</span><span>✓ PWA offline</span>
+        </div>
+      </div>
+      <div class="terminal-card" aria-label="Ejemplo de script generado">
+        <div class="terminal-head"><span></span><span></span><span></span><small>PowerShell</small></div>
+        <pre><code><span class="code-muted"># AppHub 404 verifica cada paquete</span>
+<span class="code-accent">winget show</span> --id Microsoft.PowerToys -e
+<span class="code-accent">winget install</span> --id Microsoft.PowerToys -e
+<span class="code-accent">winget install</span> --id 7zip.7zip -e
+<span class="code-good">✓ Registro y resumen de resultados</span></code></pre>
+      </div>
+    </section>
+
+    <section class="stats-strip" aria-label="Resumen del catálogo">
+      <article><strong id="statApps">0</strong><span>aplicaciones</span></article>
+      <article><strong id="statCategories">0</strong><span>categorías</span></article>
+      <article><strong id="statPacks">0</strong><span>packs rápidos</span></article>
+      <article><strong>100%</strong><span>procesamiento local</span></article>
+    </section>
+
+
+    <section class="section system-section" id="mi-pc">
+      <div class="section-heading">
+        <div><p class="eyebrow">CENTRO DEL EQUIPO</p><h2>Inventario y salud del PC</h2></div>
+        <p>Ejecuta el analizador local, importa su JSON y consulta aplicaciones, actualizaciones y comprobaciones sin subir datos.</p>
+      </div>
+
+      <div class="system-actions">
+        <a class="button button-primary" href="tools/apphub-404-scan.ps1" download>Descargar analizador</a>
+        <button class="button button-secondary" id="importInventoryButton" type="button">Importar inventario</button>
+        <button class="button button-ghost" id="exportBackupButton" type="button">Crear backup</button>
+        <button class="button button-ghost" id="importBackupButton" type="button">Restaurar backup</button>
+      </div>
+
+      <div class="privacy-note"><strong>Flujo local:</strong> el script crea un JSON en tu Escritorio; la web lo lee únicamente en tu navegador.</div>
+
+      <div class="system-empty" id="systemEmpty">
+        <div class="system-empty-icon" aria-hidden="true">PC</div>
+        <div><h3>Aún no hay ningún inventario cargado</h3><p>Descarga el analizador, ejecútalo en Windows y después importa el archivo <code>AppHub404-Inventory-*.json</code>.</p></div>
+      </div>
+
+      <div class="system-dashboard hidden" id="systemDashboard">
+        <div class="inventory-toolbar">
+          <label><span>Equipo activo</span><select id="inventorySelect"></select></label>
+          <button class="button button-secondary" id="exportMarkdownButton" type="button">Exportar Markdown</button>
+          <button class="button button-ghost" id="deleteInventoryButton" type="button">Eliminar</button>
+        </div>
+
+        <div class="system-kpis">
+          <article><span>Equipo</span><strong id="pcNameValue">—</strong><small id="pcModelValue">—</small></article>
+          <article><span>Windows</span><strong id="windowsValue">—</strong><small id="windowsBuildValue">—</small></article>
+          <article><span>Aplicaciones</span><strong id="installedCountValue">0</strong><small id="catalogMatchValue">0 del catálogo</small></article>
+          <article><span>Actualizaciones</span><strong id="updatesCountValue">0</strong><small id="scanDateValue">—</small></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="dashboard-card">
+            <div class="card-heading"><div><p class="eyebrow">HEALTH CHECK</p><h3>Estado del sistema</h3></div><span id="healthScore" class="score-pill">—</span></div>
+            <div class="health-list" id="healthList"></div>
+          </section>
+          <section class="dashboard-card">
+            <div class="card-heading"><div><p class="eyebrow">ACTUALIZACIONES</p><h3>Pendientes detectadas</h3></div><button class="text-button" id="openUpdaterFromDashboard" type="button">Crear actualizador</button></div>
+            <div class="compact-table-wrap"><table class="compact-table"><thead><tr><th scope="col">Aplicación</th><th scope="col">Instalada</th><th scope="col">Disponible</th></tr></thead><tbody id="updatesTableBody"></tbody></table></div>
+          </section>
+        </div>
+
+        <section class="dashboard-card inventory-card">
+          <div class="card-heading"><div><p class="eyebrow">INVENTARIO</p><h3>Software reconocido por WinGet</h3></div><label class="mini-search"><span class="sr-only">Buscar en inventario</span><input id="inventorySearch" type="search" placeholder="Buscar aplicación o ID"></label></div>
+          <div class="compact-table-wrap inventory-table-wrap"><table class="compact-table"><thead><tr><th scope="col">Aplicación</th><th scope="col">ID</th><th scope="col">Versión</th><th scope="col">Origen</th></tr></thead><tbody id="inventoryTableBody"></tbody></table></div>
+        </section>
+
+        <section class="dashboard-card compare-card">
+          <div class="card-heading"><div><p class="eyebrow">COMPARADOR</p><h3>Comparar dos equipos</h3></div></div>
+          <div class="compare-controls">
+            <label><span>Equipo A</span><select id="compareA"></select></label>
+            <label><span>Equipo B</span><select id="compareB"></select></label>
+            <button class="button button-secondary" id="compareButton" type="button">Comparar</button>
+          </div>
+          <div id="compareResults" class="compare-results"><p>Guarda dos inventarios para ver diferencias de software.</p></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="section updater-section" id="actualizaciones">
+      <div class="updater-panel">
+        <div class="updater-copy">
+          <p class="eyebrow">CENTRO DE ACTUALIZACIONES</p>
+          <h2>Mantén al día las aplicaciones instaladas.</h2>
+          <p>Genera un actualizador local que primero muestra las versiones disponibles y después ejecuta <code>winget upgrade --all</code> con opciones seguras.</p>
+          <div class="updater-actions">
+            <button class="button button-primary" id="openUpdater" type="button">Crear actualizador</button>
+            <button class="button button-secondary" id="copyScanCommand" type="button">Copiar comando de análisis</button>
+          </div>
+          <div class="updater-safety" aria-label="Protecciones del actualizador">
+            <span>✓ Respeta bloqueos</span>
+            <span>✓ Sin reinicio automático</span>
+            <span>✓ Registro local</span>
+          </div>
+        </div>
+        <div class="updater-terminal" aria-label="Comandos de actualización WinGet">
+          <div class="terminal-head"><span></span><span></span><span></span><small>WinGet Update</small></div>
+          <pre><code><span class="code-muted"># Comprobar actualizaciones</span>
+<span class="code-accent">winget list</span> --upgrade-available
+
+<span class="code-muted"># Actualizar las compatibles</span>
+<span class="code-accent">winget upgrade</span> --all
+
+<span class="code-good">✓ Los paquetes fijados se respetan</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="packs">
+      <div class="section-heading">
+        <div><p class="eyebrow">CONFIGURACIONES RÁPIDAS</p><h2>Packs preparados</h2></div>
+        <p>Empieza con una selección profesional y modifícala a tu gusto.</p>
+      </div>
+      <div class="packs-grid" id="packsGrid"></div>
+    </section>
+
+    <section class="section catalog-section" id="catalogo">
+      <div class="section-heading">
+        <div><p class="eyebrow">CATÁLOGO CURADO</p><h2>Elige tus aplicaciones</h2></div>
+        <p>Los identificadores se validan en el PC antes de instalar.</p>
+      </div>
+
+      <div class="catalog-toolbar" role="search">
+        <label class="search-field">
+          <span class="sr-only">Buscar aplicaciones</span>
+          <span aria-hidden="true">⌕</span>
+          <input id="searchInput" type="search" placeholder="Buscar Chrome, Git, edición, seguridad…" autocomplete="off">
+          <kbd>/</kbd>
+        </label>
+        <label class="select-field">
+          <span class="sr-only">Filtrar por categoría</span>
+          <select id="categoryFilter"><option value="all">Todas las categorías</option></select>
+        </label>
+        <button class="button button-ghost" id="favoritesFilter" type="button" aria-pressed="false">☆ Favoritos</button>
+      </div>
+
+      <div class="catalog-meta">
+        <p id="resultsCount" aria-live="polite"></p>
+        <button class="text-button" id="clearFilters" type="button">Limpiar filtros</button>
+      </div>
+      <div class="apps-grid" id="appsGrid"></div>
+      <div class="empty-state hidden" id="emptyState">
+        <strong>No encontramos aplicaciones</strong>
+        <p>Prueba con otro término o elimina los filtros.</p>
+      </div>
+    </section>
+
+
+    <section class="section tools-section" id="herramientas">
+      <div class="section-heading">
+        <div><p class="eyebrow">AUTOMATIZACIÓN Y RECUPERACIÓN</p><h2>Herramientas del técnico</h2></div>
+        <p>Generadores locales para mantenimiento recurrente, reparación de WinGet y gestión de la selección actual.</p>
+      </div>
+      <div class="tools-grid">
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">◷</span><h3>Programar actualizaciones</h3><p>Crea una tarea de Windows que actualiza aplicaciones diariamente o una vez por semana.</p><button class="button button-secondary" id="openScheduler" type="button">Configurar tarea</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">↻</span><h3>Diagnosticar WinGet</h3><p>Genera un script de diagnóstico, actualización de fuentes y reparación opcional.</p><button class="button button-secondary" id="openRepair" type="button">Crear reparación</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">−</span><h3>Desinstalar selección</h3><p>Usa las aplicaciones seleccionadas en el catálogo para generar un desinstalador revisable.</p><button class="button button-secondary" id="downloadUninstaller" type="button">Generar desinstalador</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">✓</span><h3>Validar catálogo WinGet</h3><p>Genera un script de solo lectura que comprueba todos los IDs del catálogo y crea un informe JSON con los paquetes no disponibles.</p><button class="button button-secondary" id="downloadCatalogValidator" type="button">Generar validador</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">⇄</span><h3>Migrar configuración</h3><p>Guarda favoritos, selección, tema e inventarios para restaurarlos en otro navegador.</p><button class="button button-secondary" id="exportBackupTool" type="button">Descargar backup</button></article>
+      </div>
+    </section>
+
+    <section class="section info-grid" aria-label="Cómo funciona">
+      <article><span>01</span><h3>Selecciona</h3><p>Marca aplicaciones individuales o carga uno de los packs.</p></article>
+      <article><span>02</span><h3>Configura</h3><p>Elige instalación silenciosa, actualización de seleccionadas o mantenimiento completo del PC.</p></article>
+      <article><span>03</span><h3>Ejecuta</h3><p>Descarga el script, revísalo y ejecútalo en Windows; si hace falta, solicitará elevación UAC.</p></article>
+    </section>
+
+    <section class="section warning-panel">
+      <div><p class="eyebrow">TRANSPARENCIA TÉCNICA</p><h2>El navegador no puede ejecutar WinGet.</h2></div>
+      <p>AppHub 404 genera archivos locales que tú controlas. Puede instalar una selección o actualizar las aplicaciones reconocidas por WinGet, respetando por defecto los paquetes fijados y sin forzar reinicios.</p>
+    </section>
+  </main>
+
+  <aside class="selection-dock" id="selectionDock" aria-label="Selección actual">
+    <button class="dock-summary" id="openBuilder" type="button">
+      <span role="status" aria-live="polite"><strong id="selectedCount">0</strong> apps seleccionadas</span>
+      <span id="selectedLabel">Abre el generador</span>
+    </button>
+    <button class="button button-primary" id="generateQuick" type="button" disabled>Generar script</button>
+  </aside>
+
+  <dialog class="builder" id="builderDialog" aria-labelledby="builderTitle" aria-describedby="builderHint">
+    <form method="dialog" class="builder-shell">
+      <header class="builder-header">
+        <div><p class="eyebrow">GENERADOR SEGURO</p><h2 id="builderTitle">Crear instalación</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Cerrar">×</button>
+      </header>
+      <div class="builder-body">
+        <section class="builder-selection">
+          <div class="builder-title-row"><h3>Aplicaciones</h3><button id="clearSelection" class="text-button" type="button">Vaciar</button></div>
+          <div id="selectedAppsList" class="selected-list"></div>
+        </section>
+        <section class="builder-options">
+          <h3>Opciones</h3>
+          <label class="toggle-row"><input id="optionUpdateSources" type="checkbox" checked><span><strong>Actualizar fuentes</strong><small>Ejecuta winget source update.</small></span></label>
+          <label class="toggle-row"><input id="optionSilent" type="checkbox" checked><span><strong>Modo silencioso</strong><small>Depende de cada instalador.</small></span></label>
+          <label class="toggle-row"><input id="optionUpgrade" type="checkbox" checked><span><strong>Actualizar si ya existe</strong><small>Usa winget upgrade antes de instalar.</small></span></label>
+          <label class="toggle-row"><input id="optionCreateRestore" type="checkbox" checked><span><strong>Crear punto de restauración</strong><small>Se intenta si Windows lo permite.</small></span></label>
+          <label class="toggle-row"><input id="optionPause" type="checkbox" checked><span><strong>Pausa final</strong><small>Mantiene visible el resumen.</small></span></label>
+          <div class="format-picker" role="radiogroup" aria-label="Formato de exportación">
+            <label><input type="radio" name="format" value="ps1"><span>PowerShell<small>Avanzado</small></span></label>
+            <label><input type="radio" name="format" value="bat" checked><span>BAT<small>Recomendado · doble clic + UAC</small></span></label>
+            <label><input type="radio" name="format" value="json"><span>JSON<small>winget import</small></span></label>
+          </div>
+        </section>
+        <section class="builder-preview">
+          <div class="builder-title-row"><h3>Vista previa</h3><button id="copyPreview" class="text-button" type="button">Copiar</button></div>
+          <pre><code id="scriptPreview"></code></pre>
+        </section>
+      </div>
+      <footer class="builder-footer">
+        <p id="builderHint">Para uso normal, descarga BAT y haz doble clic: el propio archivo solicitará UAC. PowerShell requiere ejecutarlo con PowerShell, no abrirlo en un editor.</p>
+        <button class="button button-primary" id="downloadScript" type="button">Descargar PowerShell</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="builder updater-dialog" id="updaterDialog" aria-labelledby="updaterTitle" aria-describedby="updaterHint">
+    <form method="dialog" class="builder-shell">
+      <header class="builder-header">
+        <div><p class="eyebrow">MANTENIMIENTO WINGET</p><h2 id="updaterTitle">Actualizar aplicaciones instaladas</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Cerrar">×</button>
+      </header>
+      <div class="updater-builder-body">
+        <section class="builder-options">
+          <h3>Opciones seguras</h3>
+          <label class="toggle-row"><input id="updaterUpdateSources" type="checkbox" checked><span><strong>Actualizar fuentes</strong><small>Refresca el catálogo antes de analizar.</small></span></label>
+          <label class="toggle-row"><input id="updaterSilent" type="checkbox" checked><span><strong>Modo silencioso</strong><small>Reduce ventanas si el instalador lo admite.</small></span></label>
+          <label class="toggle-row"><input id="updaterUnknown" type="checkbox"><span><strong>Incluir versiones desconocidas</strong><small>Puede reinstalar paquetes cuya versión no detecta WinGet.</small></span></label>
+          <label class="toggle-row"><input id="updaterPinned" type="checkbox"><span><strong>Incluir paquetes fijados</strong><small>Incluye pins no bloqueantes; los bloqueos siguen protegidos.</small></span></label>
+          <label class="toggle-row"><input id="updaterRestore" type="checkbox" checked><span><strong>Crear punto de restauración</strong><small>Se intenta si hay permisos y está habilitado.</small></span></label>
+          <label class="toggle-row"><input id="updaterPause" type="checkbox" checked><span><strong>Pausa final</strong><small>Mantiene visible el resultado.</small></span></label>
+          <div class="format-picker" role="radiogroup" aria-label="Formato del actualizador">
+            <label><input type="radio" name="updaterFormat" value="ps1"><span>PowerShell<small>Avanzado</small></span></label>
+            <label><input type="radio" name="updaterFormat" value="bat" checked><span>BAT<small>Recomendado · doble clic + UAC</small></span></label>
+          </div>
+        </section>
+        <section class="builder-preview updater-preview">
+          <div class="builder-title-row"><h3>Vista previa</h3><button id="copyUpdaterPreview" class="text-button" type="button">Copiar</button></div>
+          <pre><code id="updaterPreview"></code></pre>
+        </section>
+      </div>
+      <footer class="builder-footer">
+        <p id="updaterHint">No utiliza <code>--force</code>, no activa reinicios y respeta los bloqueos de WinGet.</p>
+        <button class="button button-primary" id="downloadUpdater" type="button">Descargar actualizador PowerShell</button>
+      </footer>
+    </form>
+  </dialog>
+
+
+  <dialog class="builder compact-dialog" id="schedulerDialog" aria-labelledby="schedulerTitle" aria-describedby="schedulerHint">
+    <form method="dialog" class="builder-shell">
+      <header class="builder-header"><div><p class="eyebrow">PROGRAMADOR DE TAREAS</p><h2 id="schedulerTitle">Actualizaciones automáticas</h2></div><button class="icon-button" value="cancel" aria-label="Cerrar">×</button></header>
+      <div class="tool-dialog-body">
+        <section class="builder-options">
+          <label class="field-row"><span>Frecuencia</span><select id="scheduleFrequency"><option value="weekly">Semanal</option><option value="daily">Diaria</option></select></label>
+          <label class="field-row" id="scheduleDayRow"><span>Día</span><select id="scheduleDay"><option value="Sunday">Domingo</option><option value="Monday">Lunes</option><option value="Tuesday">Martes</option><option value="Wednesday">Miércoles</option><option value="Thursday">Jueves</option><option value="Friday">Viernes</option><option value="Saturday">Sábado</option></select></label>
+          <label class="field-row"><span>Hora</span><input id="scheduleTime" type="time" value="09:00"></label>
+          <label class="toggle-row"><input id="scheduleSilent" type="checkbox" checked><span><strong>Modo silencioso</strong><small>Solo cuando cada instalador lo admite.</small></span></label>
+          <label class="toggle-row"><input id="scheduleUnknown" type="checkbox"><span><strong>Versiones desconocidas</strong><small>Desmarcado por seguridad.</small></span></label>
+          <label class="toggle-row"><input id="schedulePinned" type="checkbox"><span><strong>Incluir pins no bloqueantes</strong><small>Los pins blocking continúan protegidos.</small></span></label>
+        </section>
+        <section class="builder-preview"><div class="builder-title-row"><h3>Vista previa</h3><button id="copyScheduler" class="text-button" type="button">Copiar</button></div><pre><code id="schedulerPreview"></code></pre></section>
+      </div>
+      <footer class="builder-footer"><p id="schedulerHint">La tarea se ejecuta con el usuario conectado; el instalador del programador solicita elevación UAC automáticamente.</p><div class="footer-actions"><button class="button button-ghost" id="downloadSchedulerRemoval" type="button">Descargar eliminador</button><button class="button button-primary" id="downloadScheduler" type="button">Descargar programador</button></div></footer>
+    </form>
+  </dialog>
+
+  <dialog class="builder compact-dialog" id="repairDialog" aria-labelledby="repairTitle" aria-describedby="repairHint">
+    <form method="dialog" class="builder-shell">
+      <header class="builder-header"><div><p class="eyebrow">RECUPERACIÓN CONTROLADA</p><h2 id="repairTitle">Diagnosticar y reparar WinGet</h2></div><button class="icon-button" value="cancel" aria-label="Cerrar">×</button></header>
+      <div class="tool-dialog-body">
+        <section class="builder-options">
+          <label class="toggle-row"><input id="repairInfo" type="checkbox" checked><span><strong>Recopilar diagnóstico</strong><small>Versión, arquitectura, políticas y fuentes.</small></span></label>
+          <label class="toggle-row"><input id="repairUpdateSources" type="checkbox" checked><span><strong>Actualizar fuentes</strong><small>Acción segura recomendada.</small></span></label>
+          <label class="toggle-row"><input id="repairAppInstaller" type="checkbox"><span><strong>Restablecer App Installer</strong><small>Usa Reset-AppxPackage cuando está disponible.</small></span></label>
+          <label class="toggle-row danger-toggle"><input id="repairResetSources" type="checkbox" aria-describedby="repairResetWarning"><span><strong>Restablecer fuentes predeterminadas</strong><small id="repairResetWarning">Elimina fuentes personalizadas. Requiere confirmación adicional.</small></span></label>
+        </section>
+        <section class="builder-preview"><div class="builder-title-row"><h3>Vista previa</h3><button id="copyRepair" class="text-button" type="button">Copiar</button></div><pre><code id="repairPreview"></code></pre></section>
+      </div>
+      <footer class="builder-footer"><p id="repairHint">La configuración predeterminada no elimina fuentes.</p><button class="button button-primary" id="downloadRepair" type="button">Descargar reparación</button></footer>
+    </form>
+  </dialog>
+
+  <input id="inventoryFileInput" type="file" accept="application/json,.json" aria-label="Seleccionar inventario JSON" hidden>
+  <input id="backupFileInput" type="file" accept="application/json,.json" aria-label="Seleccionar backup JSON" hidden>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+
+  <footer class="footer">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">A4</span><span><strong>AppHub</strong><small>404</small></span></div>
+    <p>Herramienta independiente. WinGet y Windows son marcas de Microsoft. Los paquetes proceden de las fuentes configuradas en cada equipo.</p>
+    <span id="appVersionLabel">v2.4.4 · Auditoría, seguridad y estabilidad</span>
+  </footer>
+
+  <noscript>AppHub 404 necesita JavaScript para generar scripts y gestionar selecciones.</noscript>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/apps-data.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/system-tools.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+{
+  "schema": "apphub-404-inventory-v2",
+  "appVersion": "2.4.4",
+  "scannedAt": "2026-07-30T09:30:00.000Z",
+  "computer": {
+    "name": "DEMO-PC",
+    "manufacturer": "Dell Inc.",
+    "model": "Latitude Demo"
+  },
+  "system": {
+    "caption": "Microsoft Windows 11 Pro",
+    "build": "26100",
+    "architecture": "64 bits",
+    "memoryGB": 16
+  },
+  "winget": {
+    "available": true,
+    "version": "v1.12.0",
+    "packages": [
+      {
+        "id": "7zip.7zip",
+        "version": "24.09",
+        "source": "winget"
+      },
+      {
+        "id": "Microsoft.PowerToys",
+        "version": "0.91.1",
+        "source": "winget"
+      },
+      {
+        "id": "XP9B49CJ91XF01",
+        "version": "4.2.0",
+        "source": "msstore"
+      }
+    ],
+    "updates": [
+      {
+        "name": "Microsoft PowerToys",
+        "id": "Microsoft.PowerToys",
+        "installed": "0.91.1",
+        "available": "0.92.0",
+        "source": "winget"
+      }
+    ]
+  },
+  "software": {
+    "registryCount": 87
+  },
+  "health": [
+    {
+      "id": "winget",
+      "label": "Windows Package Manager",
+      "status": "ok",
+      "detail": "Disponible: v1.12.0"
+    },
+    {
+      "id": "reboot",
+      "label": "Reinicio pendiente",
+      "status": "ok",
+      "detail": "No se detectó un reinicio pendiente."
+    },
+    {
+      "id": "disk-space",
+      "label": "Espacio libre del sistema",
+      "status": "warning",
+      "detail": "Solo quedan 12.8 GB libres en C:."
+    }
+  ]
+}
