@@ -202,13 +202,16 @@
     <section class="section tools-section" id="herramientas">
       <div class="section-heading">
         <div><p class="eyebrow">AUTOMATIZACIÓN Y RECUPERACIÓN</p><h2>Herramientas del técnico</h2></div>
-        <p>Generadores locales para mantenimiento recurrente, reparación de WinGet y gestión de la selección actual.</p>
+        <p>Generadores locales para mantenimiento recurrente, reparación de WinGet, gestión de la selección y backup/restauración de drivers.</p>
       </div>
       <div class="tools-grid">
         <article class="tool-card"><span class="tool-icon" aria-hidden="true">◷</span><h3>Programar actualizaciones</h3><p>Crea una tarea de Windows que actualiza aplicaciones diariamente o una vez por semana.</p><button class="button button-secondary" id="openScheduler" type="button">Configurar tarea</button></article>
         <article class="tool-card"><span class="tool-icon" aria-hidden="true">↻</span><h3>Diagnosticar WinGet</h3><p>Genera un script de diagnóstico, actualización de fuentes y reparación opcional.</p><button class="button button-secondary" id="openRepair" type="button">Crear reparación</button></article>
         <article class="tool-card"><span class="tool-icon" aria-hidden="true">−</span><h3>Desinstalar selección</h3><p>Usa las aplicaciones seleccionadas en el catálogo para generar un desinstalador revisable.</p><button class="button button-secondary" id="downloadUninstaller" type="button">Generar desinstalador</button></article>
         <article class="tool-card"><span class="tool-icon" aria-hidden="true">✓</span><h3>Validar catálogo WinGet</h3><p>Genera un script de solo lectura que comprueba todos los IDs del catálogo y crea un informe JSON con los paquetes no disponibles.</p><button class="button button-secondary" id="downloadCatalogValidator" type="button">Generar validador</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">▣</span><h3>Backup de drivers</h3><p>Genera un PowerShell que exporta los drivers de terceros del Driver Store a una carpeta elegida y crea inventario e informe.</p><button class="button button-secondary" id="downloadDriverBackup" type="button">Generar backup</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">☷</span><h3>Inventario de drivers</h3><p>Genera un informe de los paquetes de controladores instalados sin modificar el equipo.</p><button class="button button-secondary" id="downloadDriverInventory" type="button">Generar inventario</button></article>
+        <article class="tool-card"><span class="tool-icon" aria-hidden="true">↥</span><h3>Restaurar drivers</h3><p>Genera un PowerShell que permite elegir un backup y reinstalar sus INF con PnPUtil. Requiere administrador.</p><button class="button button-secondary" id="downloadDriverRestore" type="button">Generar restauración</button></article>
         <article class="tool-card"><span class="tool-icon" aria-hidden="true">⇄</span><h3>Migrar configuración</h3><p>Guarda favoritos, selección, tema e inventarios para restaurarlos en otro navegador.</p><button class="button button-secondary" id="exportBackupTool" type="button">Descargar backup</button></article>
       </div>
     </section>
@@ -216,7 +219,7 @@
     <section class="section info-grid" aria-label="Cómo funciona">
       <article><span>01</span><h3>Selecciona</h3><p>Marca aplicaciones individuales o carga uno de los packs.</p></article>
       <article><span>02</span><h3>Configura</h3><p>Elige instalación silenciosa, actualización de seleccionadas o mantenimiento completo del PC.</p></article>
-      <article><span>03</span><h3>Ejecuta</h3><p>Descarga el script, revísalo y ejecútalo en Windows; si hace falta, solicitará elevación UAC.</p></article>
+      <article><span>03</span><h3>Ejecuta</h3><p>Descarga el script, revísalo y ejecútalo en Windows. Los BAT administrativos solicitan UAC al hacer doble clic; si una política lo bloquea, usa «Ejecutar como administrador». Los PS1 también pueden solicitar UAC.</p></article>
     </section>
 
     <section class="section warning-panel">
@@ -263,7 +266,7 @@
         </section>
       </div>
       <footer class="builder-footer">
-        <p id="builderHint">Para uso normal, descarga BAT y haz doble clic: el propio archivo solicitará UAC. PowerShell requiere ejecutarlo con PowerShell, no abrirlo en un editor.</p>
+        <p id="builderHint">Para uso normal, descarga BAT y haz doble clic: solicitará UAC. Si una política corporativa bloquea el relanzamiento, usa clic derecho → Ejecutar como administrador.</p>
         <button class="button button-primary" id="downloadScript" type="button">Descargar PowerShell</button>
       </footer>
     </form>
@@ -316,7 +319,7 @@
         </section>
         <section class="builder-preview"><div class="builder-title-row"><h3>Vista previa</h3><button id="copyScheduler" class="text-button" type="button">Copiar</button></div><pre><code id="schedulerPreview"></code></pre></section>
       </div>
-      <footer class="builder-footer"><p id="schedulerHint">La tarea se ejecuta con el usuario conectado; el instalador del programador solicita elevación UAC automáticamente.</p><div class="footer-actions"><button class="button button-ghost" id="downloadSchedulerRemoval" type="button">Descargar eliminador</button><button class="button button-primary" id="downloadScheduler" type="button">Descargar programador</button></div></footer>
+      <footer class="builder-footer"><p id="schedulerHint">La tarea se ejecuta con el usuario conectado; el script del programador solicita elevación UAC si no está elevado.</p><div class="footer-actions"><button class="button button-ghost" id="downloadSchedulerRemoval" type="button">Descargar eliminador</button><button class="button button-primary" id="downloadScheduler" type="button">Descargar programador</button></div></footer>
     </form>
   </dialog>
 
@@ -344,7 +347,7 @@
   <footer class="footer">
     <div class="brand"><span class="brand-mark" aria-hidden="true">A4</span><span><strong>AppHub</strong><small>404</small></span></div>
     <p>Herramienta independiente. WinGet y Windows son marcas de Microsoft. Los paquetes proceden de las fuentes configuradas en cada equipo.</p>
-    <span id="appVersionLabel">v2.5.0 · Auditoría, seguridad y estabilidad</span>
+    <div class="footer-maintenance"><button id="clearAppCache" class="text-button" type="button" title="Elimina solo las cachés de AppHub 404 y recarga la versión actual">Limpiar caché y recargar</button><span id="appVersionLabel">v2.7.2 · Cache self-healing + UAC</span></div>
   </footer>
 
   <noscript>AppHub 404 necesita JavaScript para generar scripts y gestionar selecciones.</noscript>

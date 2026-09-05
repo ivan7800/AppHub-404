@@ -1,60 +1,74 @@
-# Seguridad — AppHub 404 v2.5.0
+# Seguridad — AppHub 404 v2.7.2
 
-## Modelo de seguridad
+## Modelo
 
-AppHub 404 es una aplicación estática. No dispone de backend, cuentas, API propia, telemetría ni subida automática de datos. La interfaz no puede ejecutar comandos del sistema; únicamente genera archivos que deben ser revisados y ejecutados localmente por el usuario.
+AppHub 404 es una PWA estática. No tiene backend, autenticación, cookies de sesión, telemetría ni almacenamiento remoto. Las preferencias e inventarios importados se mantienen en el navegador.
 
-## Principios aplicados
+## Superficie de riesgo principal
 
-- Content Security Policy sin `unsafe-inline` para scripts.
-- Sin dependencias runtime externas ni CDN.
-- Enlaces externos en HTTPS y abiertos con `noopener noreferrer`.
-- Datos locales saneados antes de renderizarse.
-- Límites de tamaño y cardinalidad para inventarios y backups.
-- Aplicaciones marcadas como `externalOnly` excluidas de instalación, desinstalación, packs automáticos y restauración de selección.
-- Service worker limitado al mismo origen y sin fallback HTML para recursos no HTML.
-- Ninguna credencial se incluye en scripts.
+La principal superficie sensible no es la PWA en sí, sino los **scripts administrativos que genera** para ejecutarse después en Windows.
 
-## Elevación UAC
+### Controles aplicados
 
-Los scripts que administran Windows comprueban si tienen privilegios de administrador. Cuando es necesario se relanzan con `Start-Process -Verb RunAs` usando el mismo ejecutable de PowerShell y argumentos explícitos.
+- Los paquetes automatizables se identifican mediante IDs WinGet del catálogo; los elementos `externalOnly` nunca entran en scripts automáticos.
+- Los comandos WinGet usan argumentos separados/entrecomillados y no construyen comandos a partir de texto libre del usuario.
+- No se generan credenciales, tokens ni secretos.
+- No se usa `--force` por defecto.
+- No se usa `--allow-reboot`.
+- No se usa `ExecutionPolicy Bypass` en v2.7.2.
+- Desinstalación y restauración de drivers exigen confirmación explícita.
+- Drivers 404 no elimina paquetes ni fuerza downgrades.
+- El analizador de inventario no instala, actualiza ni desinstala software.
 
-No se usa:
+## UAC y privilegios
 
-- `ExecutionPolicy Bypass`;
-- almacenamiento de contraseñas;
-- elevación silenciosa;
-- mecanismos para saltarse UAC;
-- `--force` como comportamiento predeterminado;
-- reinicio automático.
+### BAT y UAC
 
-Si el usuario cancela UAC, la operación administrativa no continúa.
+En v2.7.2 los BAT generados:
 
-Los BAT pasan su propia ruta mediante una variable de entorno antes de solicitar `RunAs`, evitando insertar directamente rutas potencialmente problemáticas dentro del comando PowerShell.
+1. comprueban elevación mediante `fltmc`;
+2. si ya están elevados, continúan sin relanzarse;
+3. si no lo están, conservan su ruta real mediante `%~f0`;
+4. invocan Windows PowerShell desde `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`;
+5. crean `ProcessStartInfo` con `UseShellExecute = $true` y verbo `runas` sobre el propio BAT;
+6. si UAC se cancela o falla, muestran un error visible y mantienen como fallback el menú **Ejecutar como administrador**.
 
-## WinGet
+No se utiliza la antigua cadena `cmd /c`, ni copias temporales del BAT, ni `ExecutionPolicy Bypass`.
 
-Los IDs de paquetes son datos operativos que pueden cambiar. AppHub v2.5.0 incorpora un **validador de catálogo de solo lectura** que ejecuta `winget show --id <ID> -e --source <origen>` y genera un informe JSON. No instala ni modifica software.
+## PowerShell
 
-Las descargas corporativas que no cuentan con un mecanismo WinGet fiable se presentan como enlaces oficiales externos y no entran en scripts automáticos.
+Los PS1 administrativos comparten una guardia de elevación basada en:
 
-## Inventarios
+- comprobación de `WindowsPrincipal`;
+- identificación del ejecutable PowerShell actual mediante `Get-Process -Id $PID`;
+- `System.Diagnostics.ProcessStartInfo`;
+- `UseShellExecute = $true`;
+- verbo `runas`.
 
-El importador limita y sanea los datos antes de almacenarlos. Se rechazan estructuras inesperadas o sobredimensionadas. Las copias restauradas vuelven a filtrarse contra el catálogo actual y no pueden reactivar aplicaciones `externalOnly` como instalables.
+No se construye una ruta `System32\WindowsPowerShell\v1.0\powershell.exe` dentro de templates JavaScript, evitando la corrupción de barras invertidas detectada en versiones anteriores.
 
-El analizador PowerShell es de solo lectura. Por defecto no exporta nombres de todas las aplicaciones del Registro; solo su recuento. La opción `-IncludeDiagnosticText` incorpora información adicional y debe utilizarse conscientemente.
+## Causa raíz de escapes corregida desde 2.7.0
 
-## Riesgos que AppHub no puede eliminar
+Las versiones previas contenían rutas Windows dentro de template strings JavaScript con barras simples. JavaScript interpreta secuencias de escape antes de producir el archivo descargado. En especial `\v` puede convertirse en un carácter de control vertical-tab y otras secuencias pueden perder la barra invertida.
 
-- Un manifiesto WinGet puede cambiar o desaparecer después de publicar AppHub.
-- Un instalador de terceros puede tener su propio comportamiento o solicitar privilegios adicionales.
-- Políticas corporativas pueden bloquear WinGet, Microsoft Store, PowerShell, scripts o UAC.
-- Software malicioso previamente presente en el equipo puede alterar herramientas del sistema.
+La v2.7.2 mantiene estas correcciones:
 
-## Recomendaciones de despliegue
+- elimina esas rutas rígidas de los generadores UAC;
+- escapa correctamente las rutas que sí deben aparecer como texto generado;
+- ejecuta los generadores reales durante QA;
+- rechaza scripts generados con caracteres de control inesperados.
 
-1. Pruebe primero en un equipo o VM no crítico.
-2. Valide el catálogo desde un Windows real antes de una publicación importante.
-3. Revise los scripts generados antes de ejecutarlos.
-4. Mantenga Windows, App Installer y Microsoft Defender actualizados.
-5. En empresa, respete Intune, AppLocker/WDAC, GPO y las políticas de software autorizadas.
+## CSP y enlaces
+
+La CSP mantiene `style-src 'self'` sin `unsafe-inline`. Los enlaces externos se aíslan con `noopener noreferrer` cuando se abren en nueva pestaña.
+
+## Catálogo cambiante
+
+Los IDs WinGet pueden cambiar después de publicar la PWA. AppHub incluye un validador local de solo lectura que ejecuta `winget show` por paquete y genera un informe JSON. Esta validación no instala ni modifica software.
+
+## Límites
+
+- La ejecución final depende de Windows, WinGet, políticas UAC/AppLocker/WDAC y de los instaladores de terceros.
+- Un paquete WinGet válido puede fallar por red, proxy, arquitectura, política corporativa, licencia o cambios del editor.
+- El backup de drivers exporta paquetes INF del Driver Store, no todas las utilidades OEM.
+- Esta auditoría no sustituye pruebas en un equipo Windows administrado con las políticas reales de la organización.

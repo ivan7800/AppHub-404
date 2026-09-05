@@ -2,7 +2,7 @@
   'use strict';
 
   const CONFIG = window.APPHUB_CONFIG || {};
-  const VERSION = CONFIG.version || '2.5.0';
+  const VERSION = CONFIG.version || '2.7.2';
   const INVENTORY_SCHEMA = CONFIG.inventorySchema || 'apphub-404-inventory-v2';
   const BACKUP_SCHEMA = CONFIG.backupSchema || 'apphub-404-backup-v2';
   const INVENTORY_KEY = 'apphub-inventories-v2';
@@ -32,7 +32,7 @@
     openUpdaterFromDashboard: $('#openUpdaterFromDashboard'),
     schedulerDialog: $('#schedulerDialog'), openScheduler: $('#openScheduler'), scheduleFrequency: $('#scheduleFrequency'), scheduleDayRow: $('#scheduleDayRow'), scheduleDay: $('#scheduleDay'), scheduleTime: $('#scheduleTime'), scheduleSilent: $('#scheduleSilent'), scheduleUnknown: $('#scheduleUnknown'), schedulePinned: $('#schedulePinned'), schedulerPreview: $('#schedulerPreview'), copyScheduler: $('#copyScheduler'), downloadScheduler: $('#downloadScheduler'), downloadSchedulerRemoval: $('#downloadSchedulerRemoval'),
     repairDialog: $('#repairDialog'), openRepair: $('#openRepair'), repairInfo: $('#repairInfo'), repairUpdateSources: $('#repairUpdateSources'), repairAppInstaller: $('#repairAppInstaller'), repairResetSources: $('#repairResetSources'), repairPreview: $('#repairPreview'), repairHint: $('#repairHint'), copyRepair: $('#copyRepair'), downloadRepair: $('#downloadRepair'),
-    downloadUninstaller: $('#downloadUninstaller'), downloadCatalogValidator: $('#downloadCatalogValidator'), toastRegion: $('#toastRegion')
+    downloadUninstaller: $('#downloadUninstaller'), downloadCatalogValidator: $('#downloadCatalogValidator'), downloadDriverBackup: $('#downloadDriverBackup'), downloadDriverInventory: $('#downloadDriverInventory'), downloadDriverRestore: $('#downloadDriverRestore'), toastRegion: $('#toastRegion')
   };
 
   let inventories = loadStoredInventories();
@@ -82,6 +82,9 @@
     els.downloadRepair?.addEventListener('click', () => downloadText('apphub-404-reparar-winget.ps1', generateRepairScript()));
     els.downloadUninstaller?.addEventListener('click', downloadUninstaller);
     els.downloadCatalogValidator?.addEventListener('click', downloadCatalogValidator);
+    els.downloadDriverBackup?.addEventListener('click', () => downloadText('apphub-404-backup-drivers.ps1', generateDriverBackupScript()));
+    els.downloadDriverInventory?.addEventListener('click', () => downloadText('apphub-404-inventario-drivers.ps1', generateDriverInventoryScript()));
+    els.downloadDriverRestore?.addEventListener('click', () => downloadText('apphub-404-restaurar-drivers.ps1', generateDriverRestoreScript()));
 
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
@@ -332,6 +335,33 @@
     }
   }
 
+  function powershellAdminGuard() {
+    return `$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)
+if (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if (-not $PSCommandPath) { Write-Error 'Guarda primero el script como archivo .ps1 para poder solicitar UAC.'; exit 1 }
+    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow
+    try {
+        $PowerShellExe = (Get-Process -Id $PID -ErrorAction Stop).Path
+        if (-not $PowerShellExe) { throw 'No se pudo identificar el ejecutable de PowerShell actual.' }
+        $Psi = New-Object System.Diagnostics.ProcessStartInfo
+        $Psi.FileName = $PowerShellExe
+        $Psi.UseShellExecute = $true
+        $Psi.Verb = 'runas'
+        $Psi.WorkingDirectory = Split-Path -Parent $PSCommandPath
+        $Psi.Arguments = '-NoLogo -NoProfile -File "' + $PSCommandPath + '"'
+        $Elevated = [System.Diagnostics.Process]::Start($Psi)
+        if ($null -ne $Elevated) { exit 0 }
+        throw 'No se pudo iniciar el proceso elevado.'
+    } catch {
+        Write-Error ('No se pudo obtener elevación UAC: ' + $_.Exception.Message)
+        Write-Host 'Alternativa fiable: abre Windows Terminal o PowerShell como administrador y ejecuta este archivo.' -ForegroundColor Yellow
+        Read-Host 'Pulsa Enter para cerrar'
+        exit 1
+    }
+}`;
+  }
+
   function updateSchedulerPreview() {
     if (!els.schedulerPreview) return;
     els.scheduleDayRow.classList.toggle('hidden', els.scheduleFrequency.value === 'daily');
@@ -349,8 +379,39 @@
     const trigger = frequency === 'daily'
       ? `$Trigger = New-ScheduledTaskTrigger -Daily -At '${time}'`
       : `$Trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek ${day} -At '${time}'`;
-    return `# AppHub 404 v${VERSION} · Programador de actualizaciones\n# Se autoeleva mediante UAC si es necesario. La tarea se ejecuta solo con el usuario conectado.\n\n$ErrorActionPreference = 'Stop'\n$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()\n$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)\nif (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {\n    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }\n    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow\n    try {\n        $PowerShellExe = Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'\n        $QuotedScript = '\"{0}\"' -f $PSCommandPath.Replace('\"','\"\"')\n        $RelaunchArgs = @('-NoLogo','-NoProfile','-File',$QuotedScript)\n        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru\n        if ($Elevated) { exit 0 }\n        throw 'No se pudo iniciar el proceso elevado.'\n    } catch {\n        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)\n        exit 1\n    }\n}\n\nif (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'WinGet no está disponible.' }\n\n$Base = Join-Path $env:ProgramData 'AppHub404'\n$Worker = Join-Path $Base 'Update-Apps.ps1'\n$LogDir = Join-Path $Base 'Logs'\nNew-Item -ItemType Directory -Path $Base,$LogDir -Force | Out-Null\n\n@'\n$ErrorActionPreference = 'Continue'\n$LogDir = Join-Path $env:ProgramData 'AppHub404\\Logs'\nNew-Item -ItemType Directory -Path $LogDir -Force | Out-Null\n$Log = Join-Path $LogDir ('Update-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')\nwinget source update --disable-interactivity 2>&1 | Tee-Object -FilePath $Log -Append\nwinget upgrade ${flags.join(' ')} 2>&1 | Tee-Object -FilePath $Log -Append\nexit $LASTEXITCODE\n'@ | Set-Content -Path $Worker -Encoding UTF8\n\n$Action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -File "{0}"' -f $Worker)\n${trigger}\n$CurrentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-$Principal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interactive -RunLevel Highest\n$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 4) -MultipleInstances IgnoreNew\nRegister-ScheduledTask -TaskName 'AppHub 404 - Actualizar aplicaciones' -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description 'Actualiza aplicaciones compatibles mediante WinGet.' -Force | Out-Null\nWrite-Host 'Tarea creada correctamente.' -ForegroundColor Green\nWrite-Host ('Script de trabajo: {0}' -f $Worker)\nWrite-Host ('Registros: {0}' -f $LogDir)\n`;
+    return `# AppHub 404 v${VERSION} · Programador de actualizaciones
+# Se autoeleva mediante UAC si es necesario. La tarea se ejecuta solo con el usuario conectado.
+
+$ErrorActionPreference = 'Stop'
+${powershellAdminGuard()}
+
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'WinGet no está disponible.' }
+
+$Base = Join-Path $env:ProgramData 'AppHub404'
+$Worker = Join-Path $Base 'Update-Apps.ps1'
+$LogDir = Join-Path $Base 'Logs'
+New-Item -ItemType Directory -Path $Base,$LogDir -Force | Out-Null
+
+@'
+$ErrorActionPreference = 'Continue'
+$LogDir = Join-Path $env:ProgramData 'AppHub404\\Logs'
+New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+$Log = Join-Path $LogDir ('Update-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+winget source update --disable-interactivity 2>&1 | Tee-Object -FilePath $Log -Append
+winget upgrade ${flags.join(' ')} 2>&1 | Tee-Object -FilePath $Log -Append
+exit $LASTEXITCODE
+'@ | Set-Content -Path $Worker -Encoding UTF8
+
+$Action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -File "{0}"' -f $Worker)
+${trigger}
+$CurrentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+$Principal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interactive -RunLevel Highest
+$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 4) -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName 'AppHub 404 - Actualizar aplicaciones' -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description 'Actualiza aplicaciones compatibles mediante WinGet.' -Force | Out-Null
+Write-Host 'Tarea creada correctamente.' -ForegroundColor Green
+Write-Host ('Script de trabajo: {0}' -f $Worker)
+Write-Host ('Registros: {0}' -f $LogDir)
+`;
   }
 
   function generateSchedulerRemovalScript() {
@@ -358,26 +419,10 @@ $Principal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interact
 # Se autoeleva mediante UAC si es necesario. Solo elimina la tarea y su script de trabajo.
 
 $ErrorActionPreference = 'Stop'
-$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)
-if (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }
-    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow
-    try {
-        $PowerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        $QuotedScript = '"{0}"' -f $PSCommandPath.Replace('"','""')
-        $RelaunchArgs = @('-NoLogo','-NoProfile','-File',$QuotedScript)
-        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru
-        if ($Elevated) { exit 0 }
-        throw 'No se pudo iniciar el proceso elevado.'
-    } catch {
-        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)
-        exit 1
-    }
-}
+${powershellAdminGuard()}
 
 $TaskName = 'AppHub 404 - Actualizar aplicaciones'
-$Worker = Join-Path $env:ProgramData 'AppHub404\Update-Apps.ps1'
+$Worker = Join-Path $env:ProgramData 'AppHub404\\Update-Apps.ps1'
 $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 if ($Task) {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
@@ -404,7 +449,38 @@ Read-Host 'Pulsa Enter para cerrar'
     const update = els.repairUpdateSources?.checked;
     const appInstaller = els.repairAppInstaller?.checked;
     const reset = els.repairResetSources?.checked;
-    return `# AppHub 404 v${VERSION} · Diagnóstico y reparación de WinGet\n# Revisa las opciones antes de ejecutar.\n\n$ErrorActionPreference = 'Continue'\n$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()\n$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)\nif (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {\n    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }\n    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow\n    try {\n        $PowerShellExe = Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'\n        $QuotedScript = '\"{0}\"' -f $PSCommandPath.Replace('\"','\"\"')\n        $RelaunchArgs = @('-NoLogo','-NoProfile','-File',$QuotedScript)\n        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru\n        if ($Elevated) { exit 0 }\n        throw 'No se pudo iniciar el proceso elevado.'\n    } catch {\n        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)\n        exit 1\n    }\n}\n\n$Log = Join-Path $env:TEMP ('AppHub404-Repair-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')\nfunction Run-Step([string]$Title, [scriptblock]$Action) {\n    Write-Host ('\\n=== ' + $Title + ' ===') -ForegroundColor Cyan\n    try { & $Action 2>&1 | Tee-Object -FilePath $Log -Append } catch { $_ | Out-String | Tee-Object -FilePath $Log -Append }\n}\n\nRun-Step 'Comprobar WinGet' {\n    if (Get-Command winget -ErrorAction SilentlyContinue) { winget --version } else { throw 'WinGet no está disponible.' }\n}\n${info ? `Run-Step 'Información de WinGet' { winget --info }\nRun-Step 'Fuentes configuradas' { winget source list }\n` : ''}${update ? `Run-Step 'Actualizar fuentes' { winget source update --disable-interactivity }\n` : ''}${appInstaller ? `Run-Step 'Restablecer App Installer' {\n    $Package = Get-AppxPackage Microsoft.DesktopAppInstaller\n    if (-not $Package) { throw 'App Installer no está instalado para este usuario.' }\n    if (Get-Command Reset-AppxPackage -ErrorAction SilentlyContinue) { $Package | Reset-AppxPackage }\n    else { Add-AppxPackage -DisableDevelopmentMode -Register (Join-Path $Package.InstallLocation 'AppxManifest.xml') }\n}\n` : ''}${reset ? `Run-Step 'RESTABLECER FUENTES PREDETERMINADAS' { winget source reset --force }\nRun-Step 'Actualizar fuentes restauradas' { winget source update --disable-interactivity }\n` : ''}\nWrite-Host ('\\nDiagnóstico finalizado. Registro: {0}' -f $Log) -ForegroundColor Green\nRead-Host 'Pulsa Enter para cerrar'\n`;
+    return `# AppHub 404 v${VERSION} · Diagnóstico y reparación de WinGet
+# Revisa las opciones antes de ejecutar.
+
+$ErrorActionPreference = 'Continue'
+${powershellAdminGuard()}
+
+$Log = Join-Path $env:TEMP ('AppHub404-Repair-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+function Run-Step([string]$Title, [scriptblock]$Action) {
+    Write-Host ''
+    Write-Host ('=== ' + $Title + ' ===') -ForegroundColor Cyan
+    try { & $Action 2>&1 | Tee-Object -FilePath $Log -Append } catch { $_ | Out-String | Tee-Object -FilePath $Log -Append }
+}
+
+Run-Step 'Comprobar WinGet' {
+    if (Get-Command winget -ErrorAction SilentlyContinue) { winget --version } else { throw 'WinGet no está disponible.' }
+}
+${info ? `Run-Step 'Información de WinGet' { winget --info }
+Run-Step 'Fuentes configuradas' { winget source list }
+` : ''}${update ? `Run-Step 'Actualizar fuentes' { winget source update --disable-interactivity }
+` : ''}${appInstaller ? `Run-Step 'Restablecer App Installer' {
+    $Package = Get-AppxPackage Microsoft.DesktopAppInstaller
+    if (-not $Package) { throw 'App Installer no está instalado para este usuario.' }
+    if (Get-Command Reset-AppxPackage -ErrorAction SilentlyContinue) { $Package | Reset-AppxPackage }
+    else { Add-AppxPackage -DisableDevelopmentMode -Register (Join-Path $Package.InstallLocation 'AppxManifest.xml') }
+}
+` : ''}${reset ? `Run-Step 'RESTABLECER FUENTES PREDETERMINADAS' { winget source reset --force }
+Run-Step 'Actualizar fuentes restauradas' { winget source update --disable-interactivity }
+` : ''}
+Write-Host ''
+Write-Host ('Diagnóstico finalizado. Registro: {0}' -f $Log) -ForegroundColor Green
+Read-Host 'Pulsa Enter para cerrar'
+`;
   }
 
   function downloadUninstaller() {
@@ -414,7 +490,30 @@ Read-Host 'Pulsa Enter para cerrar'
       const app = appById.get(id);
       return `    [pscustomobject]@{ Name='${psEscape(app.name)}'; Id='${psEscape(id)}'; Source='${psEscape(app.source || 'winget')}' }`;
     }).join(',\n');
-    const script = `# AppHub 404 v${VERSION} · Desinstalador de selección\n# Revisa la lista. No usa --force ni elimina datos personales de forma adicional.\n\n$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()\n$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)\nif (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {\n    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }\n    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow\n    try {\n        $PowerShellExe = Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'\n        $QuotedScript = '\"{0}\"' -f $PSCommandPath.Replace('\"','\"\"')\n        $RelaunchArgs = @('-NoLogo','-NoProfile','-File',$QuotedScript)\n        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru\n        if ($Elevated) { exit 0 }\n        throw 'No se pudo iniciar el proceso elevado.'\n    } catch {\n        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)\n        exit 1\n    }\n}\n\n$Packages = @(\n${packages}\n)\nWrite-Host 'Aplicaciones seleccionadas para desinstalar:' -ForegroundColor Yellow\n$Packages | ForEach-Object { Write-Host (' - ' + $_.Name + ' [' + $_.Id + ']') }\n$Confirmation = Read-Host 'Escribe DESINSTALAR para continuar'\nif ($Confirmation -cne 'DESINSTALAR') {\n    Write-Host 'Operación cancelada. No se ha modificado el equipo.' -ForegroundColor Yellow\n    exit 0\n}\nforeach ($Package in $Packages) {\n    Write-Host ('\\n=== ' + $Package.Name + ' ===') -ForegroundColor Cyan\n    $InstalledOutput = (& winget list --id $Package.Id -e --source $Package.Source --accept-source-agreements --disable-interactivity 2>&1 | Out-String)\n    $Installed = ($LASTEXITCODE -eq 0) -and ($InstalledOutput -match [regex]::Escape($Package.Id))\n    if ($Installed) {\n        & winget uninstall --id $Package.Id -e --source $Package.Source --accept-source-agreements --disable-interactivity\n        if ($LASTEXITCODE -ne 0) { Write-Host ('Error al desinstalar. Código: ' + $LASTEXITCODE) -ForegroundColor Red }\n    } else { Write-Host 'No instalada o no reconocida por WinGet.' -ForegroundColor Yellow }\n}\nRead-Host 'Pulsa Enter para cerrar'\n`;
+    const script = `# AppHub 404 v${VERSION} · Desinstalador de selección
+# Revisa la lista. No usa --force ni elimina datos personales de forma adicional.
+
+$ErrorActionPreference = 'Continue'
+${powershellAdminGuard()}
+
+$Packages = @(
+${packages}
+)
+Write-Host 'Aplicaciones seleccionadas para desinstalar:' -ForegroundColor Yellow
+$Packages | ForEach-Object { Write-Host (' - ' + $_.Name + ' [' + $_.Id + ']') }
+$Confirmation = Read-Host 'Escribe DESINSTALAR para continuar'
+if ($Confirmation -cne 'DESINSTALAR') {
+    Write-Host 'Operación cancelada. No se ha modificado el equipo.' -ForegroundColor Yellow
+    exit 0
+}
+foreach ($Package in $Packages) {
+    Write-Host ''
+    Write-Host ('=== ' + $Package.Name + ' ===') -ForegroundColor Cyan
+    & winget uninstall --id $Package.Id -e --source $Package.Source --accept-source-agreements --disable-interactivity 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) { Write-Host ('Error al desinstalar. Código: ' + $LASTEXITCODE) -ForegroundColor Red }
+}
+Read-Host 'Pulsa Enter para cerrar'
+`;
     downloadText('apphub-404-desinstalar-seleccion.ps1', script);
   }
 
@@ -483,6 +582,159 @@ Write-Host ('Informe: {0}' -f $OutputPath) -ForegroundColor Cyan
 if (-not $NoPause) { Read-Host 'Pulsa Enter para cerrar' }
 `;
     downloadText('apphub-404-validar-catalogo.ps1', script);
+  }
+
+  function driverAdminGuard() {
+    return powershellAdminGuard();
+  }
+
+  function driverFolderPicker(title, description) {
+    return `Add-Type -AssemblyName System.Windows.Forms
+$Dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+$Dialog.Description = '${description}'
+$Dialog.ShowNewFolderButton = $true
+if ($Dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    Write-Host 'Operación cancelada.' -ForegroundColor Yellow
+    exit 0
+}
+$SelectedFolder = $Dialog.SelectedPath
+`;
+  }
+
+  function generateDriverBackupScript() {
+    return `# AppHub 404 v${VERSION} · Drivers 404 · Backup de drivers
+# Exporta paquetes de controladores de terceros del Driver Store. No exporta utilidades OEM ni instaladores EXE.
+
+[CmdletBinding()]
+param()
+$ErrorActionPreference = 'Stop'
+${driverAdminGuard()}
+${driverFolderPicker('backup', 'Elige la carpeta donde guardar el backup de drivers')}
+$Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$Computer = ($env:COMPUTERNAME -replace '[^A-Za-z0-9._-]', '_')
+$BackupRoot = Join-Path $SelectedFolder ("DriversBackup-$Computer-$Stamp")
+$DriversPath = Join-Path $BackupRoot 'Drivers'
+New-Item -ItemType Directory -Path $DriversPath -Force | Out-Null
+$LogPath = Join-Path $BackupRoot 'backup-drivers.log'
+$InventoryPath = Join-Path $BackupRoot 'drivers-inventory.txt'
+$SummaryPath = Join-Path $BackupRoot 'README-BACKUP.txt'
+
+Write-Host '=== AppHub 404 · Backup de drivers ===' -ForegroundColor Cyan
+Write-Host ('Destino: ' + $BackupRoot)
+
+& pnputil.exe /enum-drivers 2>&1 | Tee-Object -FilePath $InventoryPath | Out-Host
+Write-Host ''
+Write-Host 'Exportando drivers con PnPUtil...' -ForegroundColor Cyan
+& pnputil.exe /export-driver '*' $DriversPath 2>&1 | Tee-Object -FilePath $LogPath | Out-Host
+$ExitCode = $LASTEXITCODE
+$Method = 'PnPUtil'
+
+if ($ExitCode -ne 0) {
+    Write-Warning ('PnPUtil devolvió código ' + $ExitCode + '. Probando DISM como fallback...')
+    & dism.exe /Online /Export-Driver (('/Destination:{0}' -f $DriversPath)) 2>&1 | Tee-Object -FilePath $LogPath -Append | Out-Host
+    $ExitCode = $LASTEXITCODE
+    $Method = 'DISM fallback'
+}
+
+$InfFiles = @(Get-ChildItem -LiteralPath $DriversPath -Filter '*.inf' -Recurse -File -ErrorAction SilentlyContinue)
+$Summary = @(
+    'AppHub 404 · Drivers 404',
+    ('Equipo: ' + $env:COMPUTERNAME),
+    ('Fecha: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')),
+    ('Método: ' + $Method),
+    ('Código de salida: ' + $ExitCode),
+    ('Paquetes INF exportados: ' + $InfFiles.Count),
+    ('Carpeta: ' + $DriversPath),
+    '',
+    'Este backup contiene paquetes INF del Driver Store. No garantiza incluir aplicaciones, paneles o instaladores OEM del fabricante.'
+)
+$Summary | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
+
+if ($ExitCode -eq 0 -and $InfFiles.Count -gt 0) {
+    Write-Host ('Backup completado. INF encontrados: ' + $InfFiles.Count) -ForegroundColor Green
+    Write-Host ('Carpeta: ' + $BackupRoot) -ForegroundColor Green
+    Start-Process explorer.exe -ArgumentList ('"' + $BackupRoot + '"')
+} else {
+    Write-Error ('El backup no pudo verificarse. Código: ' + $ExitCode + '; INF encontrados: ' + $InfFiles.Count)
+}
+Read-Host 'Pulsa Enter para cerrar'
+`;
+  }
+
+  function generateDriverInventoryScript() {
+    return `# AppHub 404 v${VERSION} · Drivers 404 · Inventario de drivers
+# Solo lectura: enumera paquetes de controladores de terceros.
+
+[CmdletBinding()]
+param()
+$ErrorActionPreference = 'Stop'
+${driverFolderPicker('inventory', 'Elige la carpeta donde guardar el inventario de drivers')}
+$Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$Computer = ($env:COMPUTERNAME -replace '[^A-Za-z0-9._-]', '_')
+$Output = Join-Path $SelectedFolder ("DriversInventory-$Computer-$Stamp.txt")
+
+Write-Host '=== AppHub 404 · Inventario de drivers ===' -ForegroundColor Cyan
+$Header = @(
+    'AppHub 404 · Drivers 404 · Inventario',
+    ('Equipo: ' + $env:COMPUTERNAME),
+    ('Fecha: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')),
+    ''
+)
+$Header | Set-Content -LiteralPath $Output -Encoding UTF8
+& pnputil.exe /enum-drivers 2>&1 | Tee-Object -FilePath $Output -Append | Out-Host
+if ($LASTEXITCODE -ne 0) { Write-Error ('PnPUtil devolvió código: ' + $LASTEXITCODE) }
+Write-Host ('Inventario guardado en: ' + $Output) -ForegroundColor Green
+Read-Host 'Pulsa Enter para cerrar'
+`;
+  }
+
+  function generateDriverRestoreScript() {
+    return `# AppHub 404 v${VERSION} · Drivers 404 · Restaurar drivers
+# Agrega al Driver Store los INF encontrados y solicita instalación sobre dispositivos existentes.
+
+[CmdletBinding()]
+param()
+$ErrorActionPreference = 'Continue'
+${driverAdminGuard()}
+${driverFolderPicker('restore', 'Elige la carpeta Drivers de un backup creado por AppHub 404')}
+$InfFiles = @(Get-ChildItem -LiteralPath $SelectedFolder -Filter '*.inf' -Recurse -File -ErrorAction SilentlyContinue)
+if ($InfFiles.Count -eq 0) {
+    Write-Error 'No se encontraron archivos INF en la carpeta seleccionada.'
+    Read-Host 'Pulsa Enter para cerrar'
+    exit 2
+}
+
+Write-Host '=== AppHub 404 · Restaurar drivers ===' -ForegroundColor Cyan
+Write-Host ('INF encontrados: ' + $InfFiles.Count) -ForegroundColor Yellow
+Write-Host 'Windows decidirá qué controlador es aplicable; no se fuerzan eliminaciones ni downgrades.' -ForegroundColor Yellow
+$Confirm = Read-Host 'Escribe RESTAURAR para continuar'
+if ($Confirm -cne 'RESTAURAR') {
+    Write-Host 'Operación cancelada. No se ha modificado el equipo.' -ForegroundColor Yellow
+    exit 0
+}
+
+$Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$LogPath = Join-Path $SelectedFolder ("restore-drivers-$Stamp.log")
+$Ok = 0; $Failed = 0; $Reboot = $false
+foreach ($Inf in $InfFiles) {
+    Write-Host ('Procesando: ' + $Inf.FullName) -ForegroundColor Cyan
+    & pnputil.exe /add-driver $Inf.FullName /install 2>&1 | Tee-Object -FilePath $LogPath -Append | Out-Host
+    $Code = $LASTEXITCODE
+    if ($Code -in @(0, 3010, 1641)) {
+        $Ok++
+        if ($Code -in @(3010, 1641)) { $Reboot = $true }
+    } else {
+        $Failed++
+        Add-Content -LiteralPath $LogPath -Value ('ERROR ' + $Code + ' :: ' + $Inf.FullName)
+    }
+}
+
+Write-Host ''
+Write-Host ('Correctos: ' + $Ok + ' · Fallidos: ' + $Failed) -ForegroundColor $(if ($Failed -eq 0) { 'Green' } else { 'Yellow' })
+Write-Host ('Log: ' + $LogPath)
+if ($Reboot) { Write-Warning 'Algún controlador indicó que puede requerirse reinicio.' }
+Read-Host 'Pulsa Enter para cerrar'
+`;
   }
 
   function observeCatalog() {

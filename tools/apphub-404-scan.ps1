@@ -1,4 +1,4 @@
-# AppHub 404 v2.5.0 - Analizador local de inventario y salud
+# AppHub 404 v2.7.2 - Analizador local de inventario y salud
 # No instala, actualiza ni desinstala aplicaciones. Solo recopila información local y crea un JSON.
 [CmdletBinding()]
 param(
@@ -12,16 +12,23 @@ $CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)
 if (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     if (-not $PSCommandPath) { Write-Error 'Guarda el analizador como .ps1 antes de ejecutarlo.'; exit 1 }
     Write-Host 'Solicitando permisos de administrador mediante UAC para completar el diagnóstico...' -ForegroundColor Yellow
-    $RelaunchArgs = @('-NoProfile','-File',('"{0}"' -f $PSCommandPath),'-OutputPath',('"{0}"' -f $OutputPath))
-    if ($IncludeDiagnosticText) { $RelaunchArgs += '-IncludeDiagnosticText' }
-    if ($NoPause) { $RelaunchArgs += '-NoPause' }
     try {
-        $PowerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru
-        if ($Elevated) { exit 0 }
+        $PowerShellExe = (Get-Process -Id $PID -ErrorAction Stop).Path
+        if (-not $PowerShellExe) { throw 'No se pudo identificar el ejecutable de PowerShell actual.' }
+        $Arguments = '-NoProfile -File "' + $PSCommandPath + '" -OutputPath "' + $OutputPath + '"'
+        if ($IncludeDiagnosticText) { $Arguments += ' -IncludeDiagnosticText' }
+        if ($NoPause) { $Arguments += ' -NoPause' }
+        $Psi = New-Object System.Diagnostics.ProcessStartInfo
+        $Psi.FileName = $PowerShellExe
+        $Psi.UseShellExecute = $true
+        $Psi.Verb = 'runas'
+        $Psi.WorkingDirectory = Split-Path -Parent $PSCommandPath
+        $Psi.Arguments = $Arguments
+        $Elevated = [System.Diagnostics.Process]::Start($Psi)
+        if ($null -ne $Elevated) { exit 0 }
         throw 'No se pudo iniciar el proceso elevado.'
     } catch {
-        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)
+        Write-Error ('No se obtuvo elevación UAC: ' + $_.Exception.Message)
         exit 1
     }
 }
@@ -176,7 +183,7 @@ $RegistrySoftware = @($RegistrySoftware | Sort-Object name,version,publisher -Un
 
 $Inventory = [ordered]@{
     schema = 'apphub-404-inventory-v2'
-    appVersion = '2.5.0'
+    appVersion = '2.7.2'
     scannedAt = (Get-Date).ToUniversalTime().ToString('o')
     computer = [ordered]@{
         name = $env:COMPUTERNAME

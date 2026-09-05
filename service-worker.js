@@ -1,4 +1,5 @@
-const CACHE = 'apphub-404-v2.5.0';
+const CACHE = 'apphub-404-v2.7.2';
+const CACHE_PREFIX = 'apphub-404-';
 const CORE = [
   './',
   './index.html',
@@ -24,11 +25,21 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    const oldAppHubCaches = keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE);
+    await Promise.all(oldAppHubCaches.map(key => caches.delete(key)));
+    await self.clients.claim();
+
+    // Si esta activación sustituye una versión anterior, recarga una vez las
+    // ventanas controladas para evitar que permanezcan ejecutando JS antiguo.
+    if (oldAppHubCaches.length) {
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      await Promise.all(clients.map(async client => {
+        try { await client.navigate(client.url); } catch {}
+      }));
+    }
+  })());
 });
 
 self.addEventListener('fetch', event => {
@@ -43,12 +54,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  event.respondWith(cacheFirst(request, event));
+  const critical = /\/(?:index\.html|manifest\.webmanifest|assets\/js\/(?:config|app|apps-data|system-tools)\.js|assets\/css\/styles\.css)$/.test(url.pathname);
+  event.respondWith(critical ? networkFirstAsset(request) : cacheFirst(request, event));
 });
 
 async function networkFirstNavigation(request) {
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-store' });
     if (isCacheable(response)) {
       const cache = await caches.open(CACHE);
       await cache.put(request, response.clone());
@@ -56,6 +68,14 @@ async function networkFirstNavigation(request) {
     return response;
   } catch {
     return (await caches.match(request)) || (await caches.match('./index.html')) || Response.error();
+  }
+}
+
+async function networkFirstAsset(request) {
+  try {
+    return await fetchAndCache(request, { cache: 'no-store' });
+  } catch {
+    return (await caches.match(request)) || Response.error();
   }
 }
 
@@ -68,8 +88,8 @@ async function cacheFirst(request, event) {
   return fetchAndCache(request);
 }
 
-async function fetchAndCache(request) {
-  const response = await fetch(request);
+async function fetchAndCache(request, init) {
+  const response = await fetch(request, init);
   if (isCacheable(response)) {
     const cache = await caches.open(CACHE);
     await cache.put(request, response.clone());
