@@ -1,4 +1,4 @@
-const CACHE = 'apphub-404-v2.4.7';
+const CACHE = 'apphub-404-v2.5.0';
 const CORE = [
   './',
   './index.html',

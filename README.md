@@ -1,17 +1,24 @@
-# AppHub 404 v2.4.7
+# AppHub 404 v2.5.0
 
 AppHub 404 es una PWA estática y local-first para gestionar software de Windows mediante WinGet sin backend, cuentas ni telemetría. Permite explorar un catálogo curado, generar scripts de instalación/actualización/desinstalación, importar inventarios, comparar equipos, crear copias de seguridad y generar herramientas de diagnóstico y mantenimiento.
 
 ## Estado
 
-- Versión: **2.4.7**
-- Catálogo: **86 aplicaciones**
+- Versión: **2.5.0**
+- Catálogo: **93 aplicaciones**
 - Categorías: **13**
 - Packs: **9**
 - Publicación: GitHub Pages / servidor estático / apertura local de `index.html`
 - Backend: no
 - Dependencias runtime: no
 - Telemetría: no
+
+## Novedades v2.5.0
+
+- Catálogo ampliado a **93 aplicaciones** y **12 packs**.
+- Nuevas aplicaciones WinGet: **WinMerge**, **Visual Studio 2022 Community**, **Visual Studio 2022 Build Tools**, **Eclipse Temurin JDK 21**, **DB Browser for SQLite** y **mRemoteNG**.
+- **Malwarebytes AdwCleaner** integrado como herramienta portátil mediante enlaces oficiales. Se marca `externalOnly`, por lo que AppHub no inventa ni ejecuta un ID WinGet para AdwCleaner.
+- Nuevos packs: **Nuevo PC corporativo**, **Técnico CAU / Helpdesk** y **Desarrollador Windows**.
 
 ## Funciones principales
 
@@ -114,7 +121,7 @@ Consulte `QA-REPORT.md`, `SECURITY.md` y `FINAL-AUDIT-REPORT.md` antes de public
 
 ## Limitaciones reales
 
-Una PWA no puede ejecutar WinGet ni inspeccionar Windows directamente. AppHub genera scripts revisables que el usuario ejecuta localmente. La disponibilidad de un ID WinGet puede cambiar después de publicar la PWA; por eso v2.4.7 incorpora el validador local del catálogo.
+Una PWA no puede ejecutar WinGet ni inspeccionar Windows directamente. AppHub genera scripts revisables que el usuario ejecuta localmente. La disponibilidad de un ID WinGet puede cambiar después de publicar la PWA; por eso v2.5.0 incorpora el validador local del catálogo.
 
 La ejecución real de UAC, WinGet, PowerShell y el Programador de tareas debe validarse en Windows 10/11. El service worker solo funciona en contexto seguro (HTTPS o localhost), no desde `file://`.
 
