@@ -1,25 +1,92 @@
-## v2.5.0 — Catálogo profesional y packs de despliegue
+# Changelog
+
+## 2.7.2 — Cache self-healing
+
+- Detecta el cambio de versión al iniciar y elimina cachés `apphub-404-*` antiguas.
+- Recarga una sola vez tras un cambio de versión para evitar mezclar JS/HTML de releases distintas.
+- El service worker fuerza actualización de los recursos críticos con estrategia network-first y `cache: no-store`.
+- Al activar una nueva versión, elimina cachés AppHub anteriores y recarga las ventanas que seguían ejecutando la release vieja.
+- Nuevo botón **Limpiar caché y recargar** que purga solo Cache Storage de AppHub, conserva preferencias/inventarios locales y actualiza el service worker.
+- Se mantienen el funcionamiento offline y la caché actual tras completar la actualización.
+
+
+## 2.7.2 — BAT doble clic + UAC
+
+- Añadida autoelevación BAT al hacer doble clic mediante `ProcessStartInfo`, `UseShellExecute=true` y verbo `runas` sobre el propio BAT.
+- La nueva rutina evita la cadena descartada BAT → PowerShell → `cmd /c` → BAT.
+- Windows PowerShell se invoca desde `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`; los escapes del generador están cubiertos por tests sobre el BAT final.
+- Si UAC se cancela o falla por política, el BAT conserva el fallback de clic derecho → Ejecutar como administrador.
+- Añadido `tools/test-uac-double-click.bat`, no destructivo y sin WinGet.
+- QA ampliado para ejecutar los generadores reales y exigir la rutina UAC en instalador y actualizador BAT.
+
+## 2.7.0 — Corrección raíz de scripts Windows y release auditada
+
+### Corregido
+- Identificada la causa raíz de varios BAT/PS1 defectuosos: rutas Windows escritas dentro de template strings JavaScript con barras invertidas sin escapar. Secuencias como `\v` podían convertirse en caracteres de control y otras barras podían desaparecer al generar el archivo.
+- Eliminadas las rutas rígidas de PowerShell de los generadores administrativos; los PS1 reutilizan ahora el ejecutable PowerShell real del proceso mediante `Get-Process -Id $PID`.
+- Unificada la elevación UAC de instalador, actualizador, programador, retirada de tarea, reparación, desinstalador, analizador y Drivers 404 mediante `ProcessStartInfo` + verbo `runas`.
+- El instalador PowerShell deja de bloquearse por `winget show`/`winget list` previos: ejecuta `winget install` directamente, captura stdout/stderr y registra el código de salida.
+- Los BAT dejan de prometer autoelevación: comprueban privilegios con `fltmc` y, si no están elevados, indican de forma explícita `Ejecutar como administrador`. Se elimina el flujo BAT → PowerShell → cmd → BAT que falló repetidamente en Windows real.
+- El actualizador BAT comprueba si `winget pin` existe antes de ejecutar `pin list`.
+- Corregidas rutas generadas del programador (`AppHub404\Logs` y `AppHub404\Update-Apps.ps1`).
+- Eliminados los tests UAC antiguos que validaban una estrategia descartada; añadido `tools/test-admin-context.bat`.
+
+### QA
+- Los smoke tests ejecutan ahora los generadores reales dentro de un sandbox JS y validan el contenido final producido.
+- Añadida regresión contra caracteres de control inesperados en BAT/PS1 generados.
+- Añadidas regresiones para impedir que vuelva la autoelevación BAT defectuosa, `ExecutionPolicy Bypass`, rutas Windows mutiladas y prechecks WinGet bloqueantes.
+- Catálogo conservado: 93 aplicaciones, 13 categorías y 12 packs.
+
+### Compatibilidad
+- Los flags `winget install --no-upgrade`, `--disable-interactivity`, `--accept-package-agreements`, `winget upgrade --all`, `--include-unknown` y `--include-pinned` se mantienen alineados con la documentación actual de Microsoft.
+
+## 2.6.3 - Updater PS1 + PWA cache fix
+
+- Corrige el generador `apphub-404-update-all.ps1` con autoelevación UAC robusta mediante `-EncodedCommand`.
+- Evita que `winget pin list` provoque errores en versiones de WinGet sin soporte de `pin`.
+- Mantiene los fallos de punto de restauración y actualización de fuentes como no bloqueantes.
+- Cambia los assets críticos de la PWA a estrategia network-first para evitar generar scripts desde JavaScript obsoleto en caché.
+- Añade regresiones de versión/caché y mantiene el catálogo en 93 apps, 13 categorías y 12 packs.
+
+
+## 2.6.3 - Drivers 404 UAC self-elevation fix
+
+- Backup, inventario y restauración de drivers ya no se limitan a mostrar un aviso si no tienen privilegios.
+- Los tres scripts PowerShell solicitan UAC automáticamente mediante `ProcessStartInfo` + verbo `runas`.
+- Eliminada la instrucción incorrecta «Ejecutar con PowerShell como administrador».
+- Se conserva la comprobación explícita de rol administrador tras el relanzamiento.
+
+## 2.6.3 - Drivers 404
+
+- Añadido módulo **Drivers 404** en Herramientas del técnico.
+- Generador de backup de drivers con PnPUtil y fallback DISM.
+- Generador de inventario de drivers de terceros.
+- Generador de restauración por INF con PnPUtil, confirmación explícita y log.
+- Verificación del backup mediante conteo de INF e informe README-BACKUP.txt.
+- Documentada la limitación: no exporta utilidades OEM ni instaladores EXE ajenos al Driver Store.
+- Caché PWA y tests actualizados a v2.6.3.
+
+## v2.6.3 — Catálogo profesional y packs de despliegue
 - Añadidos WinMerge, Visual Studio 2022 Community, Visual Studio 2022 Build Tools, Eclipse Temurin JDK 21, DB Browser for SQLite y mRemoteNG.
 - Añadido Malwarebytes AdwCleaner como herramienta portátil externa con enlaces oficiales; no se genera un comando WinGet inexistente.
 - Nuevos packs: Nuevo PC corporativo, Técnico CAU / Helpdesk y Desarrollador Windows.
 - Catálogo ampliado a 93 aplicaciones y 12 packs, manteniendo exclusión de elementos `externalOnly` de scripts automáticos.
 - Tests ampliados para validar los nuevos IDs, packs y la integración segura de AdwCleaner.
 
-## v2.5.0 — WinGet execution fix
+## v2.6.3 — WinGet execution fix
 - El BAT ya no bloquea la instalacion con `winget show`/`winget list | findstr` previos.
 - Ejecuta `winget install` directamente y muestra codigo de salida y diagnostico visible.
 - Activa delayed expansion para conservar correctamente ERRORLEVEL por paquete.
 - Mantiene `--no-upgrade` cuando la opcion de actualizar instaladas esta desactivada.
 
-# Changelog
-## v2.5.0 - UAC generator parity fix
+## v2.6.3 - UAC generator parity fix
 
 - Los BAT generados usan ahora exactamente la rutina UAC validada manualmente en Windows mediante `fltmc`, `goto :APPHUB_ELEVATED`, `APPHUB_SELF` y `Start-Process` sobre `%ComSpec%`.
 - Eliminada la comprobación administrativa PowerShell y la copia temporal del BAT generado, que divergían del test UAC funcional.
 - Añadida regresión para exigir paridad entre el BAT generado y `tools/test-uac-elevation.bat`.
 
 
-## 2.5.0 — UAC generated-BAT path isolation fix
+## 2.6.3 — UAC generated-BAT path isolation fix
 
 - Los BAT generados ya no se relanzan directamente desde la ruta de descarga.
 - Antes de solicitar UAC se copian a `%TEMP%\AppHub404\elevated-run.bat` y se eleva esa copia controlada.

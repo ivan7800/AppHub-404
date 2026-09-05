@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const CONFIG = window.APPHUB_CONFIG || { version: '2.5.0' };
+  const CONFIG = window.APPHUB_CONFIG || { version: '2.7.2' };
   const VERSION = CONFIG.version;
   const DATA = window.APPHUB_DATA;
   if (!DATA || !Array.isArray(DATA.apps) || !Array.isArray(DATA.categories) || !Array.isArray(DATA.packs)) {
@@ -33,7 +33,8 @@
     openUpdater: $('#openUpdater'), copyScanCommand: $('#copyScanCommand'),
     updaterDialog: $('#updaterDialog'), updaterPreview: $('#updaterPreview'),
     copyUpdaterPreview: $('#copyUpdaterPreview'), downloadUpdater: $('#downloadUpdater'),
-    updaterHint: $('#updaterHint'), connectionStatus: $('#connectionStatus')
+    updaterHint: $('#updaterHint'), connectionStatus: $('#connectionStatus'),
+    clearCacheButton: $('#clearAppCache')
   };
 
   init();
@@ -47,7 +48,8 @@
     bindEvents();
     restoreTheme();
     updateConnectionStatus();
-    $('#appVersionLabel').textContent = `v${VERSION} · Auditoría, seguridad y estabilidad`;
+    $('#appVersionLabel').textContent = `v${VERSION} · Cache self-healing + UAC`;
+    healCacheOnStartup();
     registerServiceWorker();
   }
 
@@ -105,6 +107,7 @@
       .forEach(id => $(`#${id}`).addEventListener('change', updateUpdater));
     els.copyUpdaterPreview.addEventListener('click', copyUpdaterPreview);
     els.downloadUpdater.addEventListener('click', downloadUpdaterScript);
+    els.clearCacheButton?.addEventListener('click', clearAppCacheAndReload);
     window.addEventListener('online', updateConnectionStatus);
     window.addEventListener('offline', updateConnectionStatus);
     window.addEventListener('apphub:settings-restored', event => {
@@ -283,6 +286,54 @@
     return $('input[name="format"]:checked').value;
   }
 
+  function powershellAdminGuard() {
+    return `$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)
+if (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }
+    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow
+    try {
+        $PowerShellExe = (Get-Process -Id $PID -ErrorAction Stop).Path
+        if (-not $PowerShellExe) { throw 'No se pudo identificar el ejecutable de PowerShell actual.' }
+        $Psi = New-Object System.Diagnostics.ProcessStartInfo
+        $Psi.FileName = $PowerShellExe
+        $Psi.UseShellExecute = $true
+        $Psi.Verb = 'runas'
+        $Psi.WorkingDirectory = Split-Path -Parent $PSCommandPath
+        $Psi.Arguments = '-NoLogo -NoProfile -File "' + $PSCommandPath + '"'
+        $Elevated = [System.Diagnostics.Process]::Start($Psi)
+        if ($null -ne $Elevated) { exit 0 }
+        throw 'No se pudo iniciar el proceso elevado.'
+    } catch {
+        Write-Error ('No se obtuvo elevación UAC: ' + $_.Exception.Message)
+        Write-Host 'Alternativa fiable: abre Windows Terminal o PowerShell como administrador y ejecuta este archivo.' -ForegroundColor Yellow
+        Read-Host 'Pulsa Enter para cerrar'
+        exit 1
+    }
+}`;
+  }
+
+
+  function batchAdminGuard() {
+    return `fltmc >nul 2>&1
+if not errorlevel 1 goto :APPHUB_ELEVATED
+echo Solicitando permisos de administrador mediante UAC...
+set "APPHUB_SELF=%~f0"
+set "APPHUB_PS=%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+if not exist "%APPHUB_PS%" goto :APPHUB_UAC_FAILED
+"%APPHUB_PS%" -NoLogo -NoProfile -Command "$Psi = New-Object System.Diagnostics.ProcessStartInfo; $Psi.FileName = $env:APPHUB_SELF; $Psi.UseShellExecute = $true; $Psi.Verb = 'runas'; $Psi.WorkingDirectory = [IO.Path]::GetDirectoryName($env:APPHUB_SELF); try { $Elevated = [Diagnostics.Process]::Start($Psi); if ($null -eq $Elevated) { exit 1 } } catch { Write-Error $_.Exception.Message; exit 1 }"
+if errorlevel 1 goto :APPHUB_UAC_FAILED
+exit /b 0
+
+:APPHUB_UAC_FAILED
+echo ERROR: No se pudo obtener elevacion UAC o se cancelo la solicitud.
+echo Alternativa: clic derecho sobre el BAT y elige Ejecutar como administrador.
+pause
+exit /b 1
+
+:APPHUB_ELEVATED`;
+  }
+
   function generateContent(format) {
     const ids = [...state.selected].filter(id => appsById.has(id) && !appsById.get(id).externalOnly);
     if (format === 'json') return generateWingetJSON(ids);
@@ -299,23 +350,7 @@
 # Generado localmente. Revisa este archivo antes de ejecutarlo.
 
 $ErrorActionPreference = 'Continue'
-$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)
-if (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }
-    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow
-    try {
-        $PowerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        $QuotedScript = '"{0}"' -f $PSCommandPath.Replace('"','""')
-        $RelaunchArgs = @('-NoLogo','-NoProfile','-File',$QuotedScript)
-        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru
-        if ($Elevated) { exit 0 }
-        throw 'No se pudo iniciar el proceso elevado.'
-    } catch {
-        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)
-        exit 1
-    }
-}
+${powershellAdminGuard()}
 
 $LogFile = Join-Path $env:TEMP ('AppHub404-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
 $Results = [System.Collections.Generic.List[object]]::new()
@@ -348,37 +383,11 @@ foreach ($Package in $Packages) {
     Write-Host ''
     Write-Host ("→ {0}" -f $Package.Name) -ForegroundColor Yellow
     if ($Package.Requirement) { Write-Host ("  Requisito: {0}" -f $Package.Requirement) -ForegroundColor DarkYellow }
-    Write-Log ("Validando {0} ({1}) en {2}" -f $Package.Name, $Package.Id, $Package.Source)
-    & winget show --id $Package.Id -e --source $Package.Source --accept-source-agreements --disable-interactivity *> $null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning ("Paquete no encontrado: {0} [{1}]" -f $Package.Id, $Package.Source)
-        $Results.Add([pscustomobject]@{ App=$Package.Name; Id=$Package.Id; Origen=$Package.Source; Estado='No encontrado' })
-        continue
-    }
-
-    $InstalledOutput = (& winget list --id $Package.Id -e --source $Package.Source --accept-source-agreements --disable-interactivity 2>&1 | Out-String)
-    $Installed = ($LASTEXITCODE -eq 0) -and ($InstalledOutput -match [regex]::Escape($Package.Id))
-    if ($Installed) {
-${options.upgrade ? `        $UpgradeCheck = (& winget list --id $Package.Id -e --source $Package.Source --upgrade-available --accept-source-agreements --disable-interactivity 2>&1 | Out-String)
-        $UpgradeAvailable = ($LASTEXITCODE -eq 0) -and ($UpgradeCheck -match [regex]::Escape($Package.Id))
-        if (-not $UpgradeAvailable) {
-            $Results.Add([pscustomobject]@{ App=$Package.Name; Id=$Package.Id; Origen=$Package.Source; Estado='Ya instalada; sin actualización' })
-            continue
-        }
-        $UpgradeArgs = @('upgrade','--id',$Package.Id,'-e','--source',$Package.Source,'--accept-package-agreements','--accept-source-agreements','--disable-interactivity'${options.silent ? ",'--silent'" : ''})
-        Write-Log ("Actualizando {0}" -f $Package.Name)
-        & winget @UpgradeArgs 2>&1 | Tee-Object -FilePath $LogFile -Append
-        $UpgradeExitCode = $LASTEXITCODE
-        $Status = if ($UpgradeExitCode -eq 0) { 'Actualizada' } else { 'Error al actualizar (' + $UpgradeExitCode + ')' }
-        $Results.Add([pscustomobject]@{ App=$Package.Name; Id=$Package.Id; Origen=$Package.Source; Estado=$Status })
-` : `        $Results.Add([pscustomobject]@{ App=$Package.Name; Id=$Package.Id; Origen=$Package.Source; Estado='Ya instalada' })
-`}        continue
-    }
-
-    $InstallArgs = @('install','--id',$Package.Id,'-e','--source',$Package.Source,'--accept-package-agreements','--accept-source-agreements','--disable-interactivity'${options.silent ? ",'--silent'" : ''})
-    Write-Log ("Instalando {0}" -f $Package.Name)
-    & winget @InstallArgs | Tee-Object -FilePath $LogFile -Append
-    $Status = if ($LASTEXITCODE -eq 0) { 'Instalada' } else { 'Error ' + $LASTEXITCODE }
+    $InstallArgs = @('install','--id',$Package.Id,'-e','--source',$Package.Source,'--accept-package-agreements','--accept-source-agreements','--disable-interactivity'${options.silent ? ",'--silent'" : ''}${options.upgrade ? '' : ",'--no-upgrade'"})
+    Write-Log ("Instalando {0} ({1})" -f $Package.Name, $Package.Id)
+    & winget @InstallArgs 2>&1 | Tee-Object -FilePath $LogFile -Append
+    $InstallExitCode = $LASTEXITCODE
+    $Status = if ($InstallExitCode -eq 0) { 'Correcto' } else { 'Error (' + $InstallExitCode + ')' }
     $Results.Add([pscustomobject]@{ App=$Package.Name; Id=$Package.Id; Origen=$Package.Source; Estado=$Status })
 }
 
@@ -398,9 +407,44 @@ ${options.pause ? "Read-Host 'Pulsa Enter para cerrar'" : ''}
       const requirement = app.requirement ? `echo Requisito: ${batSafeLabel(app.requirement)}\n` : '';
       const silent = options.silent ? ' --silent' : '';
       const noUpgrade = options.upgrade ? '' : ' --no-upgrade';
-      return `echo.\necho === ${name} ===\n${requirement}echo [INSTALANDO] ${id}\nwinget install --id "${id}" -e --source "${source}" --accept-package-agreements --accept-source-agreements --disable-interactivity${silent}${noUpgrade}\nset "APPHUB_RC=!ERRORLEVEL!"\nif "!APPHUB_RC!"=="0" (\n  echo [OK] ${id}\n) else (\n  echo [ERROR !APPHUB_RC!] ${id}\n  echo Reintentando diagnostico de paquete...\n  winget show --id "${id}" -e --source "${source}" --accept-source-agreements --disable-interactivity\n)\n`;
+      return `echo.
+echo === ${name} ===
+${requirement}echo [INSTALANDO] ${id}
+winget install --id "${id}" -e --source "${source}" --accept-package-agreements --accept-source-agreements --disable-interactivity${silent}${noUpgrade}
+set "APPHUB_RC=!ERRORLEVEL!"
+if "!APPHUB_RC!"=="0" (
+  echo [OK] ${id}
+) else (
+  echo [ERROR !APPHUB_RC!] ${id}
+  echo Reintentando diagnostico de paquete...
+  winget show --id "${id}" -e --source "${source}" --accept-source-agreements --disable-interactivity
+)
+`;
     }).join('\n');
-    return `@echo off\nsetlocal EnableExtensions EnableDelayedExpansion\ntitle AppHub 404 - WinGet\nfltmc >nul 2>&1\nif %errorlevel%==0 goto :APPHUB_ELEVATED\n\necho Solicitando permisos de administrador mediante UAC...\nset "APPHUB_SELF=%~f0"\n"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $q=[char]34; $arg='/d /c call ' + $q + $env:APPHUB_SELF + $q; $p=Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList $arg -PassThru; if($p){exit 0}else{exit 1} } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }"\nif errorlevel 1 (\n  echo ERROR: No se pudo obtener elevacion. Usa boton derecho ^> Ejecutar como administrador.\n  pause\n  exit /b 1\n)\nexit /b 0\n\n:APPHUB_ELEVATED\necho ========================================\necho AppHub 404 - Instalacion WinGet\necho ========================================\nwhere winget >nul 2>&1\nif errorlevel 1 (\n  echo ERROR: WinGet no esta disponible en esta sesion.\n  echo Ejecuta: winget --info\n  pause\n  exit /b 1\n)\nwinget --info\n${options.updateSources ? 'winget source update --disable-interactivity\n' : ''}\n${lines}\necho.\necho Proceso finalizado. Revisa los mensajes anteriores.\n${options.pause ? 'pause' : 'pause'}\nendlocal\n`;
+    return `@echo off
+setlocal EnableExtensions DisableDelayedExpansion
+title AppHub 404 - WinGet
+${batchAdminGuard()}
+setlocal EnableDelayedExpansion
+
+echo ========================================
+echo AppHub 404 - Instalacion WinGet
+echo ========================================
+where winget >nul 2>&1
+if errorlevel 1 (
+  echo ERROR: WinGet no esta disponible en esta sesion.
+  echo Ejecuta: winget --info
+  pause
+  exit /b 1
+)
+winget --info
+${options.updateSources ? 'winget source update --disable-interactivity\n' : ''}
+${lines}
+echo.
+echo Proceso finalizado. Revisa los mensajes anteriores.
+pause
+endlocal
+`;
   }
 
   function generateWingetJSON(ids) {
@@ -479,23 +523,7 @@ ${options.pause ? "Read-Host 'Pulsa Enter para cerrar'" : ''}
 # Generado localmente. No usa --force, --allow-reboot ni --uninstall-previous.
 
 $ErrorActionPreference = 'Continue'
-$CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$CurrentPrincipal = [Security.Principal.WindowsPrincipal]::new($CurrentIdentity)
-if (-not $CurrentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    if (-not $PSCommandPath) { Write-Error 'Guarda el script como .ps1 antes de ejecutarlo para poder solicitar elevación UAC.'; exit 1 }
-    Write-Host 'Solicitando permisos de administrador mediante UAC...' -ForegroundColor Yellow
-    try {
-        $PowerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        $QuotedScript = '"{0}"' -f $PSCommandPath.Replace('"','""')
-        $RelaunchArgs = @('-NoLogo','-NoProfile','-File',$QuotedScript)
-        $Elevated = Start-Process -FilePath $PowerShellExe -Verb RunAs -ArgumentList $RelaunchArgs -PassThru
-        if ($Elevated) { exit 0 }
-        throw 'No se pudo iniciar el proceso elevado.'
-    } catch {
-        Write-Error ('No se obtuvo elevación: ' + $_.Exception.Message)
-        exit 1
-    }
-}
+${powershellAdminGuard()}
 
 $LogFile = Join-Path $env:TEMP ('AppHub404-Update-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
 
@@ -526,7 +554,12 @@ Write-Host '=== Actualizaciones disponibles antes del proceso ===' -ForegroundCo
 
 Write-Host ''
 Write-Host '=== Paquetes fijados ===' -ForegroundColor Yellow
-& winget pin list --accept-source-agreements --disable-interactivity 2>&1 | Tee-Object -FilePath $LogFile -Append
+$PinHelp = (& winget pin --help 2>&1 | Out-String)
+if ($LASTEXITCODE -eq 0) {
+    & winget pin list --accept-source-agreements --disable-interactivity 2>&1 | Tee-Object -FilePath $LogFile -Append
+} else {
+    Write-Log 'La versión instalada de WinGet no admite el comando pin; se omite esta sección.'
+}
 
 $UpgradeArgs = @(${upgradeArgs.join(', ')})
 Write-Log 'Iniciando actualización de aplicaciones compatibles...'
@@ -558,20 +591,7 @@ ${options.pause ? "Read-Host 'Pulsa Enter para cerrar'" : ''}
     return `@echo off
 setlocal EnableExtensions
 title AppHub 404 - Actualizaciones WinGet
-fltmc >nul 2>&1
-if %errorlevel%==0 goto :APPHUB_ELEVATED
-
-echo Solicitando permisos de administrador mediante UAC...
-set "APPHUB_SELF=%~f0"
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $q=[char]34; $arg='/d /c call ' + $q + $env:APPHUB_SELF + $q; $p=Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList $arg -PassThru; if($p){exit 0}else{exit 1} } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }"
-if errorlevel 1 (
-  echo ERROR: No se pudo obtener elevacion. Comprueba UAC o ejecuta este BAT con ^"Ejecutar como administrador^".
-  pause
-  exit /b 1
-)
-exit /b 0
-
-:APPHUB_ELEVATED
+${batchAdminGuard()}
 set "LOG=%TEMP%\\AppHub404-Update-%RANDOM%-%RANDOM%.log"
 echo ========================================
 echo AppHub 404 - Actualizaciones WinGet
@@ -597,8 +617,14 @@ winget list --upgrade-available --accept-source-agreements --disable-interactivi
 
 echo.
 echo === Paquetes fijados ===
-winget pin list --accept-source-agreements --disable-interactivity
-winget pin list --accept-source-agreements --disable-interactivity >> "%LOG%" 2>&1
+winget pin --help >nul 2>&1
+if errorlevel 1 (
+  echo La version instalada de WinGet no admite el comando pin. Se omite.
+  echo [INFO] WinGet sin soporte de pin. >> "%LOG%"
+) else (
+  winget pin list --accept-source-agreements --disable-interactivity
+  winget pin list --accept-source-agreements --disable-interactivity >> "%LOG%" 2>&1
+)
 
 echo.
 echo === Actualizando aplicaciones compatibles ===
@@ -743,10 +769,80 @@ endlocal
     els.connectionStatus.title = online ? 'La PWA puede actualizar su caché local.' : 'El catálogo y las herramientas precargadas siguen disponibles.';
   }
 
-  function registerServiceWorker() {
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
+  const CACHE_VERSION_KEY = 'apphub-cache-version';
+  const CACHE_PREFIX = 'apphub-404-';
+
+  async function deleteOldAppHubCaches({ includeCurrent = false } = {}) {
+    if (!('caches' in window)) return 0;
+    const current = `${CACHE_PREFIX}v${VERSION}`;
+    const keys = await caches.keys();
+    const targets = keys.filter(key => key.startsWith(CACHE_PREFIX) && (includeCurrent || key !== current));
+    await Promise.all(targets.map(key => caches.delete(key)));
+    return targets.length;
+  }
+
+  async function healCacheOnStartup() {
+    if (!location.protocol.startsWith('http')) return;
+    let previous = null;
+    try { previous = localStorage.getItem(CACHE_VERSION_KEY); } catch {}
+    try {
+      const removed = await deleteOldAppHubCaches();
+      try { localStorage.setItem(CACHE_VERSION_KEY, VERSION); } catch {}
+      if (previous && previous !== VERSION) {
+        const reloadKey = `apphub-cache-healed-${VERSION}`;
+        if (sessionStorage.getItem(reloadKey) !== '1') {
+          sessionStorage.setItem(reloadKey, '1');
+          if (removed) console.info(`[AppHub 404] ${removed} caché(s) antigua(s) eliminada(s).`);
+          location.reload();
+        }
+      }
+    } catch (error) {
+      console.warn('[AppHub 404] No se pudo completar la autocuración de caché.', error);
     }
+  }
+
+  async function clearAppCacheAndReload() {
+    if (!navigator.onLine) {
+      toast('Conéctate a Internet antes de vaciar la caché de AppHub.', true);
+      return;
+    }
+    const button = els.clearCacheButton;
+    if (button) { button.disabled = true; button.textContent = 'Limpiando…'; }
+    try {
+      const removed = await deleteOldAppHubCaches({ includeCurrent: true });
+      try { localStorage.removeItem(CACHE_VERSION_KEY); } catch {}
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration('./');
+        if (registration) await registration.update().catch(() => undefined);
+      }
+      toast(`Caché de AppHub limpiada (${removed}). Recargando…`);
+      setTimeout(() => location.reload(), 250);
+    } catch (error) {
+      if (button) { button.disabled = false; button.textContent = 'Limpiar caché y recargar'; }
+      toast('No se pudo limpiar la caché de AppHub.', true);
+      console.error(error);
+    }
+  }
+
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      const key = `apphub-sw-controller-${VERSION}`;
+      if (sessionStorage.getItem(key) === '1') return;
+      reloading = true;
+      sessionStorage.setItem(key, '1');
+      location.reload();
+    });
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('./service-worker.js');
+        await registration.update().catch(() => undefined);
+      } catch (error) {
+        console.warn('[AppHub 404] Service worker no disponible.', error);
+      }
+    });
   }
 
   function loadJSON(key, fallback) {

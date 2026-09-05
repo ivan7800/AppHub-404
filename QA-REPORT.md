@@ -1,137 +1,83 @@
-# QA Report — AppHub 404 v2.5.0
+# QA Report — AppHub 404 v2.7.2
 
-Fecha: 2026-08-13
+## Resultado automático
 
-## Resultado ejecutivo
-
-**PASS estático / candidato estable para GitHub Pages.**
-
-No se han detectado bloqueos críticos en estructura, sintaxis, rutas locales, manifest, service worker o tests propios. Las operaciones reales de WinGet/PowerShell siguen requiriendo Windows para una validación end-to-end.
-
-## Pruebas ejecutadas
-
-### Tests del proyecto
+Comando:
 
 ```text
 npm test
-OK v2.5.0: 93 apps, 13 categorías, 12 packs; CSP, PWA, inventario, backups, validación de catálogo y scripts auditados.
 ```
 
-### JavaScript
+Resultado:
 
-`node --check` superado para:
+```text
+OK v2.7.2: 93 apps, 13 categorías, 12 packs; CSP, PWA, inventario, backups, validación de catálogo y scripts auditados.
+```
 
-- `assets/js/app.js`
-- `assets/js/apps-data.js`
-- `assets/js/config.js`
-- `assets/js/system-tools.js`
-- `service-worker.js`
+## Cambio validado — BAT doble clic + UAC
 
-### JSON/PWA
+Los tests ejecutan los generadores reales `generateBatch()` y `generateUpdaterBatch()` y validan el BAT final producido.
 
-Parseo correcto de:
+Se exige:
 
-- `package.json`
-- `manifest.webmanifest`
-- `examples/inventory-example.json`
+- `fltmc` para detectar si el BAT ya está elevado;
+- `APPHUB_SELF=%~f0` para conservar la ruta real del propio BAT;
+- Windows PowerShell desde `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`;
+- `System.Diagnostics.ProcessStartInfo`;
+- `UseShellExecute = $true`;
+- verbo `runas` aplicado al propio BAT;
+- fallback visible si UAC se cancela o falla;
+- ausencia de la antigua cadena `Start-Process ... $env:ComSpec` / `cmd /c`;
+- ausencia de `ExecutionPolicy Bypass`;
+- ausencia de caracteres de control inesperados en el BAT generado.
 
-Iconos comprobados:
+El instalador BAT activa `DelayedExpansion` únicamente después de terminar la fase de autoelevación, para no alterar la ruta del propio script durante el relanzamiento.
 
-- `icon-192.png`: 192×192
-- `icon-512.png`: 512×512
-- `icon-maskable-512.png`: 512×512
+## Prueba no destructiva incluida
 
-### CSS
+`tools/test-uac-double-click.bat` contiene el mismo mecanismo de elevación, no usa WinGet y no modifica el sistema. Tras aceptar UAC debe mostrar:
 
-`assets/css/styles.css` parseado con `tinycss2` sin errores de sintaxis.
+```text
+UAC OK - APPHUB 404 ESTA ELEVADO
+```
 
-### HTML y accesibilidad estática
+## Regresiones generales
 
-- 35 botones analizados.
-- 9 enlaces analizados.
-- 34 controles de formulario analizados.
-- 0 controles sin nombre accesible según análisis estático.
-- 0 anclas internas rotas.
-- 0 rutas locales HTML ausentes.
-
-### Compatibilidad de archivos
-
-- 25 archivos en el árbol auditado antes de generar documentación de entrega externa.
-- Ningún nombre con caracteres incompatibles comunes de Windows/GitHub.
-- Archivo runtime mayor: `assets/js/system-tools.js`, ~40 KB.
-- Sin dependencias runtime externas.
-
-### Servidor estático local
-
-Respuesta HTTP 200 confirmada para:
-
-- `index.html`
-- `manifest.webmanifest`
-- `service-worker.js`
-- `assets/css/styles.css`
-- `assets/js/app.js`
-- `assets/js/apps-data.js`
-- `assets/js/system-tools.js`
-- `tools/apphub-404-scan.ps1`
-- `examples/inventory-example.json`
-- `assets/icons/icon-192.png`
-
-## Regresiones específicas v2.5.0
-
-Comprobadas por tests/código:
-
-- backups no restauran aplicaciones `externalOnly` a la selección;
-- exportación/importación de backup aplica la misma regla;
-- UAC PowerShell usa argumentos explícitos;
-- BAT usa `APPHUB_SELF` para relanzarse;
-- etiquetas BAT se saneam frente a metacaracteres de `cmd.exe`;
-- validador de catálogo existe y usa esquema `apphub-404-catalog-validation-v1`;
-- validador no instala, actualiza ni desinstala;
-- service worker usa caché v2.5.0;
-- versión centralizada v2.5.0.
-
-## Pruebas no completadas
-
-### Windows real
-
-Este entorno no dispone de `pwsh`, Windows PowerShell ni WinGet. No se han ejecutado:
-
-- instalación real;
-- actualización real;
-- desinstalación real;
-- UAC real;
-- creación/eliminación real de tareas;
-- reparación real de App Installer/WinGet;
-- importación/exportación real contra WinGet.
-
-### Navegador gráfico automatizado
-
-Chromium existe en el entorno, pero el intento headless no completó por fallo GPU/DBus del contenedor. Por tanto no se afirma una prueba visual automatizada end-to-end de v2.5.0.
-
-## Matriz recomendada antes de 10/10
-
-| Plataforma | Prueba |
+| Prueba | Estado |
 |---|---|
-| Windows 11 + PowerShell 7 | instalación, update, uninstall, scanner, validator |
-| Windows 11 + PowerShell 5.1 | scanner y scripts compatibles |
-| Windows 10 compatible con WinGet | flujo completo |
-| Edge/Chrome/Firefox | catálogo, diálogos, descargas, backup |
-| iPhone/iPad/Android | responsive, navegación, diálogos |
-| GitHub Pages HTTPS | PWA install/offline/update SW |
-| NVDA/Narrator/VoiceOver | navegación y anuncios dinámicos |
+| `node --check app.js` | ✅ |
+| `node --check system-tools.js` | ✅ |
+| `node --check smoke.mjs` | ✅ |
+| generadores BAT/PS1 ejecutados en VM Node | ✅ |
+| scripts generados sin caracteres de control | ✅ |
+| catálogo 93 / categorías 13 / packs 12 | ✅ |
+| CSP/PWA/rutas relativas | ✅ |
+| secretos | ✅ sin hallazgos |
+| UAC físico Windows por doble clic | ⏳ no ejecutado en este entorno |
+| WinGet físico Windows | ⏳ no ejecutado en este entorno |
 
-## Veredicto QA
+## Casos Windows de aceptación
 
-**9,1/10.** La capa estática y de generación queda bien cubierta; la nota está limitada por la ausencia de ejecución real de la capa Windows y de E2E visual fiable en este entorno.
+1. Doble clic en `tools/test-uac-double-click.bat` → UAC → `UAC OK`.
+2. Generar BAT con 7-Zip → doble clic → UAC → instalación/estado WinGet.
+3. Repetir desde una ruta con espacios y paréntesis.
+4. Cancelar UAC → mensaje de error visible y fallback manual.
+5. Ejecutar el mismo BAT con clic derecho → debe continuar sin un segundo UAC.
+6. Actualizador BAT → doble clic → UAC → `winget upgrade`.
 
-## Prueba UAC aislada v2.5.0
+## Estado QA
 
-Se incluye `tools/test-uac-elevation.bat`. No instala software ni ejecuta WinGet. Sirve exclusivamente para comprobar el flujo: BAT sin elevar -> PowerShell -> `Start-Process -Verb RunAs` sobre `%ComSpec%` -> `cmd /d /c call "ruta-del-bat"` -> BAT elevado.
+**PASS CON LIMITACIONES**: generación, regresión y estructura verificadas; UAC/WinGet físicos requieren Windows 10/11.
 
-## Regresión de catálogo v2.5.0
+## v2.7.2 — Cache self-healing
 
-- 93 aplicaciones únicas.
-- 12 packs sin referencias inexistentes.
-- Los seis nuevos IDs WinGet están presentes como instalables.
-- AdwCleaner está marcado `externalOnly`, tiene enlaces HTTPS oficiales y no forma parte de ningún pack ejecutable.
-- Los tres nuevos packs se validan en `tests/smoke.mjs`.
+- ✅ Versión sincronizada en package/config/UI/service worker.
+- ✅ `healCacheOnStartup()` se ejecuta al iniciar.
+- ✅ La purga automática se limita a claves `apphub-404-*` y conserva la caché actual.
+- ✅ El service worker elimina cachés AppHub antiguas al activar una release nueva.
+- ✅ Los recursos críticos usan network-first con `cache: 'no-store'`.
+- ✅ Una activación que sustituye una caché anterior recarga clientes abiertos para evitar JS viejo.
+- ✅ Existe botón `Limpiar caché y recargar`.
+- ✅ La limpieza manual no usa `localStorage.clear()` y exige red antes de borrar la caché actual.
+- ✅ `npm test` y `node --check` superados tras los cambios.
+- ⏳ Actualización real desde una PWA v2.7.1 instalada en navegador/dispositivo: no ejecutada en este entorno.

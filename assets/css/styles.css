@@ -318,3 +318,7 @@ html[data-theme="dark"] .score-pill[data-level="warning"] { color:#ffc65a; }
 /* Aplicaciones empresariales externas */
 .external-app-action { text-decoration: none; justify-content: center; }
 .app-card:has(.external-app-action) code { opacity: .82; }
+
+.footer-maintenance { display:flex; align-items:flex-end; flex-direction:column; gap:.45rem; }
+.footer-maintenance .text-button { font-size:.75rem; }
+@media (max-width:800px){ .footer-maintenance { align-items:center; } }
